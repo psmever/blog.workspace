@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 루트 경로 계산
 PROJ_ROOT=$(cd "$(dirname "$0")/.." && pwd)
-COMPOSE_FILE="$PROJ_ROOT/docker-compose.local.yml"
+COMPOSE_FILE="$PROJ_ROOT/docker-compose.yml"
 SERVICE_NAME="laravel"
 
 # docker compose wrapper (plugin or legacy) detection

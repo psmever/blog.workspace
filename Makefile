@@ -1,10 +1,11 @@
 # ===============================
-# 🐳 Blog Docker Multi-Env Makefile (v7: Octane BG + Attach)
+# 🐳 Blog Docker Makefile (Local Dev, v7: Octane BG + Attach)
 # ===============================
 
 # Colima / macOS 호환 Compose Wrapper
 # (v2가 없으면 v1 명령으로 fallback)
 DC = $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
+COMPOSE_FILE = ./docker-compose.yml
 BACKEND_DIR = ../blog.backend
 FRONTEND_DIR = ../blog.frontend
 BLOG_ENV_SECRET ?= $(shell echo $$BLOG_ENV_SECRET)
@@ -14,16 +15,16 @@ COLIMA_DISK ?= 60
 .DEFAULT_GOAL := help
 
 .PHONY: colima colima-start colima-start-custom colima-status colima-stop \
-        up-local up-production down-local down-production \
+        check-env-secret check-repos \
+        up down \
         build clean reset-docker \
         sh-laravel sh-nextjs migrate seed yarn \
         logs laravel-log laravel-log-clear laravel-log-error \
         env-encrypt-local env-encrypt-production \
-        decrypt-backend-local decrypt-backend-production \
+        decrypt-docker-local decrypt-backend-local decrypt-backend-production \
         decrypt-frontend-local decrypt-frontend-production \
-        restart-docker restart-all-local restart-all-production \
-        restart-laravel-local restart-nextjs-local restart-mariadb-local \
-        restart-nginx-production restart-laravel-production restart-nextjs-production restart-mariadb-production \
+        restart-docker restart-all \
+        restart-laravel restart-nextjs restart-mariadb \
         status verify-env backup-env help
 
 help:
@@ -37,25 +38,18 @@ help:
 	@echo "  make colima-stop        → Colima 종료"
 	@echo ""
 	@echo "🎬 실행 및 종료:"
-	@echo "  make up-local           → 로컬 컨테이너 실행 (Octane :4000)"
-	@echo "  make up-production      → 프로덕션 컨테이너 실행"
-	@echo "  make down-local         → 로컬 컨테이너 중지 및 정리"
-	@echo "  make down-production    → 프로덕션 컨테이너 중지 및 정리"
+	@echo "  make up                → 로컬 컨테이너 실행 (Octane :4000)"
+	@echo "  make down              → 로컬 컨테이너 중지 및 정리"
 	@echo ""
 	@echo "🔁 재시작:"
-	@echo "  make restart-docker             → Docker(Colima) 런타임 재시작"
-	@echo "  make restart-all-local          → Docker 재시작 후 로컬 모든 컨테이너 재시작"
-	@echo "  make restart-all-production     → Docker 재시작 후 프로덕션 모든 컨테이너 재시작"
-	@echo "  make restart-nextjs-local        → 로컬 Next.js 컨테이너 재시작"
-	@echo "  make restart-laravel-local       → 로컬 Laravel 컨테이너 재시작"
-	@echo "  make restart-mariadb-local       → 로컬 MariaDB 컨테이너 재시작"
-	@echo "  make restart-nginx-production    → 프로덕션 Nginx 컨테이너 재시작"
-	@echo "  make restart-nextjs-production   → 프로덕션 Next.js 컨테이너 재시작"
-	@echo "  make restart-laravel-production  → 프로덕션 Laravel 컨테이너 재시작"
-	@echo "  make restart-mariadb-production  → 프로덕션 MariaDB 컨테이너 재시작"
+	@echo "  make restart-docker      → Docker(Colima) 런타임 재시작"
+	@echo "  make restart-all         → Docker 재시작 후 모든 컨테이너 재시작"
+	@echo "  make restart-nextjs      → Next.js 컨테이너 재시작"
+	@echo "  make restart-laravel     → Laravel 컨테이너 재시작"
+	@echo "  make restart-mariadb     → MariaDB 컨테이너 재시작"
 	@echo ""
 	@echo "🧹 빌드 및 정리:"
-	@echo "  make build              → 로컬·프로덕션 이미지 재빌드"
+	@echo "  make build              → 로컬 이미지 재빌드"
 	@echo "  make clean              → 모든 컨테이너/볼륨 정리"
 	@echo "  make reset-docker       → 관련 이미지·볼륨·네트워크 초기화"
 	@echo ""
@@ -67,7 +61,7 @@ help:
 	@echo "  make sh-nextjs          → Next.js 컨테이너 쉘 접속"
 	@echo ""
 	@echo "📜 로그:"
-	@echo "  make logs             → 로컬 docker-compose 로그 tail (기본: laravel 제외, SERVICE=이름 으로 단일 서비스 지정 가능)"
+	@echo "  make logs             → docker-compose 로그 tail (기본: laravel 제외, SERVICE=이름 으로 단일 서비스 지정 가능)"
 	@echo "  make laravel-log        → Octane 로그 tail"
 	@echo "  make laravel-log-clear  → Octane 로그 초기화"
 	@echo "  make laravel-log-error  → Octane 로그에서 ERROR 검색"
@@ -75,6 +69,7 @@ help:
 	@echo "🔐 ENV 암·복호화:"
 	@echo "  make env-encrypt-local        → 로컬 .env 암호화"
 	@echo "  make env-encrypt-production   → 프로덕션 .env 암호화"
+	@echo "  make decrypt-docker-local     → Docker .env.local.enc 복호화"
 	@echo "  make decrypt-backend-local    → 백엔드 로컬 .env 복호화"
 	@echo "  make decrypt-backend-production → 백엔드 프로덕션 .env 복호화"
 	@echo "  make decrypt-frontend-local   → 프런트 로컬 .env 복호화"
@@ -84,8 +79,10 @@ help:
 	@echo "  make verify-env         → 컨테이너 환경변수 확인"
 	@echo "  make status             → 도커 상태 리포트"
 	@echo "  make backup-env         → 암호화된 env 파일 iCloud 백업"
+	@echo "  make check-repos        → 필수 repo 경로 확인"
+	@echo "  make check-env-secret   → BLOG_ENV_SECRET 설정 확인"
 	@echo ""
-	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up-local)"
+	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
 
 # ===============================
 # 🧊 Colima Runtime Helpers
@@ -121,37 +118,47 @@ colima-stop:
 	@echo "✅ Colima stop command finished."
 
 # ===============================
+# ✅ Preflight Checks
+# ===============================
+
+check-env-secret:
+	@if [ -z "$(BLOG_ENV_SECRET)" ]; then \
+		echo "❌ BLOG_ENV_SECRET이 설정되어 있지 않습니다."; \
+		echo "   ~/.zshrc에 export BLOG_ENV_SECRET=... 추가 후 다시 실행하세요."; \
+		exit 1; \
+	fi
+
+check-repos:
+	@if [ ! -d "$(BACKEND_DIR)" ]; then \
+		echo "❌ 백엔드 경로가 없습니다: $(BACKEND_DIR)"; \
+		exit 1; \
+	fi
+	@if [ ! -d "$(FRONTEND_DIR)" ]; then \
+		echo "❌ 프런트 경로가 없습니다: $(FRONTEND_DIR)"; \
+		exit 1; \
+	fi
+
+# ===============================
 # 🚀 UP / DOWN
 # ===============================
 
-up-local:
+up:
 	@echo "🚀 Starting LOCAL containers (Octane direct on :4000)..."
+	@$(MAKE) check-repos
+	$(MAKE) decrypt-docker-local
 	$(MAKE) decrypt-backend-local
 	$(MAKE) decrypt-frontend-local
-	APP_ENV=local NODE_ENV=development $(DC) -f ./docker-compose.local.yml up -d --build
+	APP_ENV=local NODE_ENV=development $(DC) -f $(COMPOSE_FILE) up -d --build
 	@echo "✅ Local containers running (Octane direct on :4000)"
 
-up-production:
-	@echo "🚀 Starting PRODUCTION containers (Nginx + Next.js + Laravel)..."
-	$(MAKE) decrypt-backend-production
-	$(MAKE) decrypt-frontend-production
-	APP_ENV=production NODE_ENV=production $(DC) -f ./docker-compose.production.yml up -d --build
-	@echo "✅ Production containers running (Nginx + Laravel + Next.js)"
-
-down-local:
+down:
 	@echo "🛑 Stopping LOCAL containers..."
-	$(DC) -f ./docker-compose.local.yml down -v
+	$(DC) -f $(COMPOSE_FILE) down -v
 	rm -f $(BACKEND_DIR)/.env $(FRONTEND_DIR)/.env
 	@echo "✅ Local containers stopped."
 
-down-production:
-	@echo "🛑 Stopping PRODUCTION containers..."
-	$(DC) -f ./docker-compose.production.yml down -v
-	rm -f $(BACKEND_DIR)/.env $(FRONTEND_DIR)/.env
-	@echo "✅ Production containers stopped."
-
 # ===============================
-# 🔁 Restart (Local / Production)
+# 🔁 Restart
 # ===============================
 
 restart-docker:
@@ -168,52 +175,26 @@ restart-docker:
 		echo "⚠️ Colima not found. Skipping runtime restart."; \
 	fi
 
-restart-all-local:
-	@echo "🔄 Restarting Docker runtime + ALL LOCAL containers..."
+restart-all:
+	@echo "🔄 Restarting Docker runtime + ALL containers..."
 	@$(MAKE) restart-docker
-	$(DC) -f ./docker-compose.local.yml restart
-	@echo "✅ Docker runtime + all local containers restarted."
+	$(DC) -f $(COMPOSE_FILE) restart
+	@echo "✅ Docker runtime + all containers restarted."
 
-restart-all-production:
-	@echo "🔄 Restarting Docker runtime + ALL PRODUCTION containers..."
-	@$(MAKE) restart-docker
-	$(DC) -f ./docker-compose.production.yml restart
-	@echo "✅ Docker runtime + all production containers restarted."
+restart-nextjs:
+	@echo "🔄 Restarting Next.js container..."
+	$(DC) -f $(COMPOSE_FILE) restart nextjs
+	@echo "✅ Next.js restarted."
 
-restart-nextjs-local:
-	@echo "🔄 Restarting LOCAL Next.js container..."
-	$(DC) -f ./docker-compose.local.yml restart nextjs
-	@echo "✅ Local Next.js restarted."
+restart-laravel:
+	@echo "🔄 Restarting Laravel container..."
+	$(DC) -f $(COMPOSE_FILE) restart laravel
+	@echo "✅ Laravel restarted."
 
-restart-laravel-local:
-	@echo "🔄 Restarting LOCAL Laravel container..."
-	$(DC) -f ./docker-compose.local.yml restart laravel
-	@echo "✅ Local Laravel restarted."
-
-restart-mariadb-local:
-	@echo "🔄 Restarting LOCAL MariaDB container..."
-	$(DC) -f ./docker-compose.local.yml restart mariadb
-	@echo "✅ Local MariaDB restarted."
-
-restart-nginx-production:
-	@echo "🔄 Restarting PRODUCTION Nginx container..."
-	$(DC) -f ./docker-compose.production.yml restart nginx
-	@echo "✅ Production Nginx restarted."
-
-restart-nextjs-production:
-	@echo "🔄 Restarting PRODUCTION Next.js container..."
-	$(DC) -f ./docker-compose.production.yml restart nextjs
-	@echo "✅ Production Next.js restarted."
-
-restart-laravel-production:
-	@echo "🔄 Restarting PRODUCTION Laravel container..."
-	$(DC) -f ./docker-compose.production.yml restart laravel
-	@echo "✅ Production Laravel restarted."
-
-restart-mariadb-production:
-	@echo "🔄 Restarting PRODUCTION MariaDB container..."
-	$(DC) -f ./docker-compose.production.yml restart mariadb
-	@echo "✅ Production MariaDB restarted."
+restart-mariadb:
+	@echo "🔄 Restarting MariaDB container..."
+	$(DC) -f $(COMPOSE_FILE) restart mariadb
+	@echo "✅ MariaDB restarted."
 
 # ===============================
 # 🧩 Build / Clean / Reset
@@ -221,19 +202,17 @@ restart-mariadb-production:
 
 build:
 	@echo "🔧 Building Docker images..."
-	$(DC) -f ./docker-compose.local.yml build --no-cache
-	$(DC) -f ./docker-compose.production.yml build --no-cache
+	$(DC) -f $(COMPOSE_FILE) build --no-cache
 
 clean:
 	@echo "🧹 Cleaning environment..."
-	$(DC) down -v || true
+	$(DC) -f $(COMPOSE_FILE) down -v || true
 	rm -f $(BACKEND_DIR)/.env $(FRONTEND_DIR)/.env
 	@echo "✅ Clean complete."
 
 reset-docker:
 	@echo "🔥 Resetting all containers & images for this project..."
-	@$(DC) -f ./docker-compose.local.yml down -v --remove-orphans || true
-	@$(DC) -f ./docker-compose.production.yml down -v --remove-orphans || true
+	@$(DC) -f $(COMPOSE_FILE) down -v --remove-orphans || true
 	@docker image prune -af
 	@docker volume prune -f
 	@docker network prune -f
@@ -254,15 +233,15 @@ yarn:
 
 # ✅ Laravel attach 모드 (Octane 백그라운드 호환)
 sh-laravel:
-	@if ! docker ps | grep -q blog-laravel; then \
+	@if [ -z "$$($(DC) -f $(COMPOSE_FILE) ps -q laravel)" ]; then \
 		echo "⚙️ Laravel container not running — starting..."; \
-		$(DC) -f ./docker-compose.local.yml up -d laravel; \
+		$(DC) -f $(COMPOSE_FILE) up -d laravel; \
 	fi
 	@echo "🧩 Attaching to Laravel container shell..."
-	$(DC) -f ./docker-compose.local.yml exec -it laravel /bin/sh || true
+	$(DC) -f $(COMPOSE_FILE) exec -it laravel /bin/sh || true
 
 sh-nextjs:
-	$(DC) -f ./docker-compose.local.yml exec nextjs sh
+	$(DC) -f $(COMPOSE_FILE) exec nextjs sh
 
 # ===============================
 # 📜 Laravel Log Commands
@@ -271,34 +250,40 @@ sh-nextjs:
 logs:
 	@if [ -n "$$SERVICE" ]; then \
 		echo "🧾 Viewing docker compose logs for service: $$SERVICE..."; \
-		$(DC) -f ./docker-compose.local.yml logs -f --tail=100 $$SERVICE; \
+		$(DC) -f $(COMPOSE_FILE) logs -f --tail=100 $$SERVICE; \
 	else \
 		excluded_service=laravel; \
-		echo "🧾 Viewing docker compose logs for all local services (excluding $$excluded_service)..."; \
-		services=$$($(DC) -f ./docker-compose.local.yml config --services | grep -v "^$$excluded_service$$"); \
+		echo "🧾 Viewing docker compose logs for all services (excluding $$excluded_service)..."; \
+		services=$$($(DC) -f $(COMPOSE_FILE) config --services | grep -v "^$$excluded_service$$"); \
 		if [ -z "$$services" ]; then \
 			echo "⚠️ No services to tail after applying exclusion."; \
 		else \
-			$(DC) -f ./docker-compose.local.yml logs -f --tail=100 $$services; \
+			$(DC) -f $(COMPOSE_FILE) logs -f --tail=100 $$services; \
 		fi; \
 	fi
 
 laravel-log:
 	@echo "🧾 Viewing Laravel Octane log..."
-	@$(DC) -f ./docker-compose.local.yml exec laravel sh -c "tail -n 50 -f /var/log/octane.log"
+	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "tail -n 50 -f /var/log/octane.log"
 
 laravel-log-clear:
-	@$(DC) -f ./docker-compose.local.yml exec laravel sh -c "echo '' > /var/log/octane.log"
+	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "echo '' > /var/log/octane.log"
 	@echo "✅ Octane log cleared."
 
 laravel-log-error:
-	@$(DC) -f ./docker-compose.local.yml exec laravel sh -c "grep -i 'ERROR' /var/log/octane.log || echo 'No errors found ✅'"
+	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "grep -i 'ERROR' /var/log/octane.log || echo 'No errors found ✅'"
 
 # ===============================
 # 🔐 Encrypt / Decrypt ENV
 # ===============================
 
-env-encrypt-local:
+env-encrypt-local: check-env-secret
+	@echo "🔐 Encrypting docker .env → .env.local.enc..."
+	@if [ -f ./.env ]; then \
+		openssl enc -aes-256-cbc -pbkdf2 -salt \
+			-in ./.env -out ./.env.local.enc -k "$(BLOG_ENV_SECRET)"; \
+		echo "✅ Docker .env.local.enc 생성 완료."; \
+	else echo "⚠️  Docker .env not found."; fi
 	@echo "🔐 Encrypting backend .env → .env.local.enc..."
 	@if [ -f $(BACKEND_DIR)/.env ]; then \
 		cd $(BACKEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
@@ -312,7 +297,7 @@ env-encrypt-local:
 		echo "✅ Frontend .env.local.enc 생성 완료."; \
 	else echo "⚠️  Frontend .env not found."; fi
 
-env-encrypt-production:
+env-encrypt-production: check-env-secret
 	@echo "🔐 Encrypting backend .env → .env.production.enc..."
 	@if [ -f $(BACKEND_DIR)/.env ]; then \
 		cd $(BACKEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
@@ -326,7 +311,16 @@ env-encrypt-production:
 		echo "✅ Frontend .env.production.enc 생성 완료."; \
 	else echo "⚠️  Frontend .env not found."; fi
 
-decrypt-backend-local:
+decrypt-docker-local: check-env-secret
+	@echo "🔓 Decrypting docker .env.local.enc..."
+	@if [ -f ./.env.local.enc ]; then \
+		openssl enc -d -aes-256-cbc -pbkdf2 \
+			-in ./.env.local.enc \
+			-out ./.env -k "$(BLOG_ENV_SECRET)"; \
+		echo "✅ Docker .env.local.enc 복호화 완료."; \
+	else echo "⚠️  Docker .env.local.enc not found."; fi
+
+decrypt-backend-local: check-env-secret
 	@echo "🔓 Decrypting backend .env.local.enc..."
 	@if [ -f $(BACKEND_DIR)/.env.local.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
@@ -335,7 +329,7 @@ decrypt-backend-local:
 		echo "✅ Backend .env.local.enc 복호화 완료."; \
 	else echo "⚠️  Backend .env.local.enc not found."; fi
 
-decrypt-backend-production:
+decrypt-backend-production: check-env-secret
 	@echo "🔓 Decrypting backend .env.production.enc..."
 	@if [ -f $(BACKEND_DIR)/.env.production.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
@@ -344,7 +338,7 @@ decrypt-backend-production:
 		echo "✅ Backend .env.production.enc 복호화 완료."; \
 	else echo "⚠️  Backend .env.production.enc not found."; fi
 
-decrypt-frontend-local:
+decrypt-frontend-local: check-env-secret
 	@echo "🔓 Decrypting frontend .env.local.enc..."
 	@if [ -f $(FRONTEND_DIR)/.env.local.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
@@ -353,7 +347,7 @@ decrypt-frontend-local:
 		echo "✅ Frontend .env.local.enc 복호화 완료."; \
 	else echo "⚠️  Frontend .env.local.enc not found."; fi
 
-decrypt-frontend-production:
+decrypt-frontend-production: check-env-secret
 	@echo "🔓 Decrypting frontend .env.production.enc..."
 	@if [ -f $(FRONTEND_DIR)/.env.production.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
@@ -368,8 +362,8 @@ decrypt-frontend-production:
 
 verify-env:
 	@echo "\n🧠 Verifying Environment Variables..."
-	-@$(DC) exec laravel printenv | grep APP_ENV || echo "⚠️ Laravel not running."
-	-@$(DC) exec nextjs printenv | grep NODE_ENV || echo "⚠️ Next.js not running."
+	-@$(DC) -f $(COMPOSE_FILE) exec laravel printenv | grep APP_ENV || echo "⚠️ Laravel not running."
+	-@$(DC) -f $(COMPOSE_FILE) exec nextjs printenv | grep NODE_ENV || echo "⚠️ Next.js not running."
 	@echo "✅ Environment 확인 완료."
 
 status:
@@ -386,6 +380,7 @@ status:
 
 backup-env:
 	@mkdir -p ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs
+	cp -v ./.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
 	cp -v $(BACKEND_DIR)/.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
 	cp -v $(FRONTEND_DIR)/.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
 	@echo "✅ Encrypted envs backed up to iCloud."

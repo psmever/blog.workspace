@@ -11,4 +11,4 @@ else
   exit 1
 fi
 
-"${DC_CMD[@]}" -f "$PROJ_ROOT/docker-compose.yml" run --rm php composer "$@"
+"${DC_CMD[@]}" -f "$PROJ_ROOT/docker-compose.yml" run --rm --entrypoint composer laravel "$@"

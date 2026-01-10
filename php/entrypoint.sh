@@ -17,6 +17,13 @@ else
     echo "✅ .env 파일 감지됨"
 fi
 
+# --- 의존성 설치 (최초 1회) ---
+if [ ! -f /var/www/html/vendor/autoload.php ]; then
+    echo "📦 Installing composer dependencies..."
+    export COMPOSER_ALLOW_SUPERUSER=1
+    composer install --no-interaction --prefer-dist
+fi
+
 # --- 최적화 캐시 초기화 ---
 php artisan optimize:clear || true
 

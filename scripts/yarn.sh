@@ -11,4 +11,4 @@ else
   exit 1
 fi
 
-"${DC_CMD[@]}" -f "$PROJ_ROOT/docker-compose.yml" run --rm node yarn "$@"
+"${DC_CMD[@]}" -f "$PROJ_ROOT/docker-compose.yml" run --rm nextjs yarn "$@"

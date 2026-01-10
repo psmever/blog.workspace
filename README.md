@@ -1,7 +1,7 @@
 # 🐳 Blog Docker Development Environment
 
-Laravel (Backend) + Next.js (Frontend) + MariaDB + Nginx
-개발/운영 환경을 분리하고, `.env` 파일을 암호화하여 관리하는 안전한 로컬 개발 환경입니다.
+Laravel (Backend) + Next.js (Frontend) + MariaDB
+로컬 개발을 위한 Docker 환경이며, `.env` 파일을 암호화하여 관리할 수 있습니다.
 
 ---
 
@@ -14,15 +14,7 @@ blog/
 └── blog.docker/        # Docker 설정 및 관리 (현재 디렉토리)
 ```
 
----
-
-## ⚙️ 환경별 구성
-
-| 환경 | 설명 |
-|------|------|
-| `local` | 로컬 개발용 (Docker + hot reload) |
-| `development` | 개발 서버 배포용 |
-| `production` | 실서비스용 |
+위 폴더 이름과 상대 위치는 고정입니다. (`blog.docker` 기준으로 `../blog.backend`, `../blog.frontend`)
 
 ---
 
@@ -37,13 +29,10 @@ blog/
 | `make colima-start-custom` | 환경변수로 지정한 리소스로 Colima 수동 실행 |
 | `make colima-status` | Colima 현재 상태 출력 |
 | `make colima-stop` | Colima 종료 |
-| `make up local` | local 환경으로 컨테이너 실행 |
-| `make up development` | development 환경 실행 |
-| `make up production` | production 환경 실행 |
-| `make down` | 모든 컨테이너 중지 및 정리 |
+| `make up` | 로컬 컨테이너 실행 (Octane :4000) |
+| `make down` | 로컬 컨테이너 중지 및 정리 |
 | `make restart-docker` | Docker(Colima) 런타임 재시작 |
-| `make restart-all-local` | Docker 재시작 후 로컬 모든 컨테이너 재시작 |
-| `make restart-all-production` | Docker 재시작 후 프로덕션 모든 컨테이너 재시작 |
+| `make restart-all` | Docker 재시작 후 모든 컨테이너 재시작 |
 | `make build` | 이미지 캐시 없이 재빌드 |
 | `make status` | 컨테이너, 환경, env 상태 요약 표시 |
 
@@ -53,12 +42,11 @@ blog/
 
 | 명령어 | 설명 |
 |--------|------|
-| `make env-encrypt local` | `.env → .env.local.enc` 암호화 |
-| `make env-encrypt development` | `.env → .env.development.enc` 암호화 |
-| `make env-encrypt production` | `.env → .env.production.enc` 암호화 |
-| `make decrypt-backend local` | backend `.env.local.enc → .env` 복호화 |
-| `make decrypt-frontend local` | frontend `.env.local.enc → .env` 복호화 |
-| `make backup-env local` | 암호화된 env 파일을 iCloud에 백업 |
+| `make env-encrypt-local` | `.env → .env.local.enc` 암호화 |
+| `make decrypt-backend-local` | backend `.env.local.enc → .env` 복호화 |
+| `make decrypt-frontend-local` | frontend `.env.local.enc → .env` 복호화 |
+| `make decrypt-docker-local` | docker `.env.local.enc → .env` 복호화 |
+| `make backup-env` | 암호화된 env 파일을 iCloud에 백업 |
 
 🔑 암호화 키는 macOS `~/.zshrc` 에 설정:
 ```bash
@@ -73,8 +61,8 @@ export BLOG_ENV_SECRET="EKckuME1QJavOkoLE3ZlMOeqz8Kxzi4Jje7vyvms1s8="
 |--------|------|
 | `make migrate` | DB 마이그레이션 실행 |
 | `make seed` | DB 시더 실행 |
-| `make sh-php` | PHP 컨테이너 접속 |
-| `make sh-node` | Node 컨테이너 접속 |
+| `make sh-laravel` | Laravel 컨테이너 접속 |
+| `make sh-nextjs` | Next.js 컨테이너 접속 |
 
 ---
 
@@ -115,10 +103,9 @@ make status
 
 ```
 🟢 Docker Containers:
-  - blog-php       running
-  - blog-nginx     running
-  - blog-node      running
-  - blog-mariadb   running
+  - <project>-laravel-1   running
+  - <project>-nextjs-1    running
+  - <project>-mariadb-1   running
 
 ⚙️ Environment Summary:
 Backend .env → ../blog.backend/.env (updated: 2025-10-10)
@@ -157,7 +144,7 @@ colima status
 colima stop
 ```
 
-필요 시 `colima nerdctl` 등을 활용해 개별 VM 자원을 재조정할 수 있으며, Colima가 실행 중일 때만 `make up ...` 명령이 정상 동작합니다.
+필요 시 `colima nerdctl` 등을 활용해 개별 VM 자원을 재조정할 수 있으며, Colima가 실행 중일 때만 `make up` 명령이 정상 동작합니다.
 
 ### Makefile 헬퍼
 
@@ -179,11 +166,11 @@ COLIMA_CPU=6 COLIMA_MEMORY=16 COLIMA_DISK=80 make colima-start-custom
 
 ## ✅ 초기 세팅 순서
 
-1. `.env.local.enc`, `.env.development.enc`, `.env.production.enc` 준비
+1. `blog.docker/.env.local.enc`, `blog.backend/.env.local.enc`, `blog.frontend/.env.local.enc` 준비
 2. `~/.zshrc` 에 `BLOG_ENV_SECRET` 추가 후 `source ~/.zshrc`
 3. `colima start` 로 Docker 런타임 실행 (최초 실행 후 계속 켜두면 됨)
 4. `cd blog.docker`
-5. `make up local`
+5. `make up`
 6. 브라우저에서 `http://localhost:3000` (frontend), `http://localhost:4000` (backend) 확인
 
 ---
