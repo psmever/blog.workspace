@@ -19,7 +19,7 @@ COLIMA_DISK ?= 60
         check-env-secret check-repos \
         up down \
         build clean reset-docker \
-        sh-laravel sh-nextjs migrate seed yarn \
+        sh-laravel sh-nextjs artisan migrate seed yarn \
         logs laravel-log laravel-log-clear laravel-log-error \
         env-encrypt-local env-encrypt-production \
         decrypt-docker-local decrypt-backend-local decrypt-backend-production \
@@ -55,6 +55,7 @@ help:
 	@echo "  make reset-docker       → 관련 이미지·볼륨·네트워크 초기화"
 	@echo ""
 	@echo "🧩 개발 유틸리티:"
+	@echo "  make artisan CMD=\"route:list\" → Laravel Artisan 임의 명령 실행"
 	@echo "  make migrate            → Laravel 마이그레이션 실행"
 	@echo "  make seed               → DB 시드 실행"
 	@echo "  make yarn               → Next.js 패키지 설치"
@@ -222,6 +223,13 @@ reset-docker:
 # ===============================
 # 🧩 Laravel / Next.js Utilities
 # ===============================
+
+artisan:
+	@if [ -z "$(CMD)" ]; then \
+		echo "❌ 사용법: make artisan CMD=\"route:list\""; \
+		exit 1; \
+	fi
+	./scripts/artisan.sh $(CMD)
 
 migrate:
 	./scripts/artisan.sh migrate
