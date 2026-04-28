@@ -6,6 +6,7 @@
 # (v2가 없으면 v1 명령으로 fallback)
 DC = $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
 COMPOSE_FILE = ./docker-compose.yml
+DOCKER_BUILD_ENV = DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0
 BACKEND_DIR = ../blog.backend
 FRONTEND_DIR = ../blog.frontend
 BLOG_ENV_SECRET ?= $(shell echo $$BLOG_ENV_SECRET)
@@ -148,7 +149,7 @@ up:
 	$(MAKE) decrypt-docker-local
 	$(MAKE) decrypt-backend-local
 	$(MAKE) decrypt-frontend-local
-	APP_ENV=local NODE_ENV=development $(DC) -f $(COMPOSE_FILE) up -d --build
+	$(DOCKER_BUILD_ENV) APP_ENV=local NODE_ENV=development $(DC) -f $(COMPOSE_FILE) up -d --build
 	@echo "✅ Local containers running (Octane direct on :4000)"
 
 down:
@@ -202,7 +203,7 @@ restart-mariadb:
 
 build:
 	@echo "🔧 Building Docker images..."
-	$(DC) -f $(COMPOSE_FILE) build --no-cache
+	$(DOCKER_BUILD_ENV) $(DC) -f $(COMPOSE_FILE) build --no-cache
 
 clean:
 	@echo "🧹 Cleaning environment..."
