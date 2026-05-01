@@ -16,6 +16,9 @@ RUN apk add --no-cache tzdata \
 # Composer 복사
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# PHP 설정 복사
+COPY php.ini /usr/local/etc/php/conf.d/99-custom.ini
+
 # 워킹 디렉토리 설정
 WORKDIR /var/www/html
 
