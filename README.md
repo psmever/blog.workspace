@@ -40,12 +40,27 @@ blog/
 
 ### 🔐 환경 파일 관리 (.env)
 
+#### Local
+
 | 명령어 | 설명 |
 |--------|------|
-| `make env-encrypt-local` | `.env → .env.local.enc` 암호화 |
+| `make env-encrypt-local` | docker/backend/frontend `.env → .env.local.enc` 암호화 |
+| `make decrypt-docker-local` | docker `.env.local.enc → .env` 복호화 |
 | `make decrypt-backend-local` | backend `.env.local.enc → .env` 복호화 |
 | `make decrypt-frontend-local` | frontend `.env.local.enc → .env` 복호화 |
-| `make decrypt-docker-local` | docker `.env.local.enc → .env` 복호화 |
+
+#### Production
+
+| 명령어 | 설명 |
+|--------|------|
+| `make env-encrypt-production` | backend/frontend `.env → .env.production.enc` 암호화 |
+| `make decrypt-backend-production` | backend `.env.production.enc → .env` 복호화 |
+| `make decrypt-frontend-production` | frontend `.env.production.enc → .env` 복호화 |
+
+#### Common
+
+| 명령어 | 설명 |
+|--------|------|
 | `make backup-env` | 암호화된 env 파일을 iCloud에 백업 |
 
 🔑 암호화 키는 macOS `~/.zshrc` 에 설정:
