@@ -13,6 +13,8 @@ BLOG_ENV_SECRET ?= $(shell echo $$BLOG_ENV_SECRET)
 COLIMA_CPU ?= 4
 COLIMA_MEMORY ?= 8
 COLIMA_DISK ?= 60
+ARTISAN_GOALS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
 .DEFAULT_GOAL := help
 
 .PHONY: colima colima-start colima-start-custom colima-status colima-stop \
@@ -27,6 +29,11 @@ COLIMA_DISK ?= 60
         restart-docker restart-all \
         restart-laravel restart-nextjs restart-mariadb \
         status verify-env backup-env help
+
+ifeq ($(firstword $(MAKECMDGOALS)),artisan)
+%:
+	@:
+endif
 
 help:
 	@echo "📚 Blog Docker 환경 명령어 안내"
@@ -55,7 +62,8 @@ help:
 	@echo "  make reset-docker       → 관련 이미지·볼륨·네트워크 초기화"
 	@echo ""
 	@echo "🧩 개발 유틸리티:"
-	@echo "  make artisan CMD=\"route:list\" → Laravel Artisan 임의 명령 실행"
+	@echo "  make artisan route:list      → Laravel Artisan 임의 명령 실행"
+	@echo "  make artisan CMD=\"route:list\" → 기존 방식도 계속 사용 가능"
 	@echo "  make migrate            → Laravel 마이그레이션 실행"
 	@echo "  make seed               → DB 시드 실행"
 	@echo "  make yarn               → Next.js 패키지 설치"
@@ -228,11 +236,12 @@ reset-docker:
 # ===============================
 
 artisan:
-	@if [ -z "$(CMD)" ]; then \
-		echo "❌ 사용법: make artisan CMD=\"route:list\""; \
+	@if [ -z "$(ARTISAN_CMD)" ]; then \
+		echo "❌ 사용법: make artisan route:list"; \
+		echo "   또는: make artisan CMD=\"route:list\""; \
 		exit 1; \
 	fi
-	./scripts/artisan.sh $(CMD)
+	./scripts/artisan.sh $(ARTISAN_CMD)
 
 migrate:
 	./scripts/artisan.sh migrate
