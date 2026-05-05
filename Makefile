@@ -22,7 +22,7 @@ ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
         up down \
         build clean reset-docker \
         sh-laravel sh-nextjs artisan migrate seed yarn \
-        logs laravel-log laravel-log-clear laravel-log-error \
+        logs laravel-log-clear laravel-log-error \
         env-encrypt-local env-encrypt-production \
         decrypt-docker-local decrypt-backend-local decrypt-backend-production \
         decrypt-frontend-local decrypt-frontend-production \
@@ -71,8 +71,7 @@ help:
 	@echo "  make sh-nextjs          → Next.js 컨테이너 쉘 접속"
 	@echo ""
 	@echo "📜 로그:"
-	@echo "  make logs             → docker-compose 로그 tail (기본: laravel 제외, SERVICE=이름 으로 단일 서비스 지정 가능)"
-	@echo "  make laravel-log        → Octane 로그 tail"
+	@echo "  make logs             → docker-compose 로그 tail + Octane 로그 tail (기본: laravel compose 로그 제외, SERVICE=이름 으로 단일 서비스 지정 가능)"
 	@echo "  make laravel-log-clear  → Octane 로그 초기화"
 	@echo "  make laravel-log-error  → Octane 로그에서 ERROR 검색"
 	@echo ""
@@ -274,18 +273,34 @@ logs:
 		$(DC) -f $(COMPOSE_FILE) logs -f --tail=100 $$SERVICE; \
 	else \
 		excluded_service=laravel; \
-		echo "🧾 Viewing docker compose logs for all services (excluding $$excluded_service)..."; \
+		echo "🧾 Viewing docker compose logs for all services (excluding $$excluded_service) + Laravel Octane log..."; \
 		services=$$($(DC) -f $(COMPOSE_FILE) config --services | grep -v "^$$excluded_service$$"); \
-		if [ -z "$$services" ]; then \
-			echo "⚠️ No services to tail after applying exclusion."; \
+		laravel_container=$$($(DC) -f $(COMPOSE_FILE) ps -q laravel); \
+		compose_pid=; \
+		octane_pid=; \
+		cleanup() { \
+			test -n "$$compose_pid" && kill "$$compose_pid" 2>/dev/null || true; \
+			test -n "$$octane_pid" && kill "$$octane_pid" 2>/dev/null || true; \
+		}; \
+		trap cleanup INT TERM EXIT; \
+		if [ -n "$$services" ]; then \
+			$(DC) -f $(COMPOSE_FILE) logs -f --tail=100 $$services & \
+			compose_pid=$$!; \
 		else \
-			$(DC) -f $(COMPOSE_FILE) logs -f --tail=100 $$services; \
+			echo "⚠️ No services to tail after applying exclusion."; \
 		fi; \
+		if [ -n "$$laravel_container" ]; then \
+			$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "tail -n 50 -f /var/log/octane.log" & \
+			octane_pid=$$!; \
+		else \
+			echo "⚠️ Laravel container not running. Skipping Octane log tail."; \
+		fi; \
+		if [ -z "$$compose_pid$$octane_pid" ]; then \
+			echo "⚠️ No log sources available."; \
+			exit 0; \
+		fi; \
+		wait; \
 	fi
-
-laravel-log:
-	@echo "🧾 Viewing Laravel Octane log..."
-	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "tail -n 50 -f /var/log/octane.log"
 
 laravel-log-clear:
 	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "echo '' > /var/log/octane.log"
