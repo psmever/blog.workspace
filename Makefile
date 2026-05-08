@@ -2,7 +2,7 @@
 # 🐳 Blog Docker Makefile (Local Dev, v7: Octane BG + Attach)
 # ===============================
 
-# Colima / macOS 호환 Compose Wrapper
+# Docker Compose Wrapper
 # (v2가 없으면 v1 명령으로 fallback)
 DC = $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
 COMPOSE_FILE = ./docker-compose.yml
@@ -10,15 +10,11 @@ DOCKER_BUILD_ENV = DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0
 BACKEND_DIR = ../blog.backend
 FRONTEND_DIR = ../blog.frontend
 BLOG_ENV_SECRET ?= $(shell echo $$BLOG_ENV_SECRET)
-COLIMA_CPU ?= 4
-COLIMA_MEMORY ?= 8
-COLIMA_DISK ?= 60
 ARTISAN_GOALS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
 .DEFAULT_GOAL := help
 
-.PHONY: colima colima-start colima-start-custom colima-status colima-stop \
-        check-env-secret check-repos \
+.PHONY: check-docker check-env-secret check-repos \
         up down \
         build clean reset-docker \
         sh-laravel sh-nextjs artisan migrate seed yarn \
@@ -26,7 +22,7 @@ ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
         env-encrypt-local env-encrypt-production \
         decrypt-docker-local decrypt-backend-local decrypt-backend-production \
         decrypt-frontend-local decrypt-frontend-production \
-        restart-docker restart-all \
+        restart-all \
         restart-laravel restart-nextjs restart-mariadb \
         status verify-env backup-env help
 
@@ -38,20 +34,12 @@ endif
 help:
 	@echo "📚 Blog Docker 환경 명령어 안내"
 	@echo "──────────────────────────────────────────────"
-	@echo "🧊 Colima Runtime:"
-	@echo "  make colima             → Colima 자동 실행 (켜져있으면 상태만 표시)"
-	@echo "  make colima-start       → config.yaml 기반 Colima 실행"
-	@echo "  make colima-start-custom → 환경변수로 리소스 지정 후 실행"
-	@echo "  make colima-status      → Colima 현재 상태 출력"
-	@echo "  make colima-stop        → Colima 종료"
-	@echo ""
 	@echo "🎬 실행 및 종료:"
 	@echo "  make up                → 로컬 컨테이너 실행 (Octane :4000)"
 	@echo "  make down              → 로컬 컨테이너 중지 및 정리"
 	@echo ""
 	@echo "🔁 재시작:"
-	@echo "  make restart-docker      → Docker(Colima) 런타임 재시작"
-	@echo "  make restart-all         → Docker 재시작 후 모든 컨테이너 재시작"
+	@echo "  make restart-all         → 모든 컨테이너 재시작"
 	@echo "  make restart-nextjs      → Next.js 컨테이너 재시작"
 	@echo "  make restart-laravel     → Laravel 컨테이너 재시작"
 	@echo "  make restart-mariadb     → MariaDB 컨테이너 재시작"
@@ -88,6 +76,7 @@ help:
 	@echo "  make decrypt-frontend-production → frontend .env.production.enc → .env"
 	@echo ""
 	@echo "🧠 상태 및 백업:"
+	@echo "  make check-docker     → Docker 런타임 연결 상태 확인"
 	@echo "  make verify-env         → 컨테이너 환경변수 확인"
 	@echo "  make status             → 도커 상태 리포트"
 	@echo "  make backup-env         → 암호화된 env 파일 iCloud 백업"
@@ -97,41 +86,26 @@ help:
 	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
 
 # ===============================
-# 🧊 Colima Runtime Helpers
-# ===============================
-
-colima:
-	@if colima status >/dev/null 2>&1; then \
-		echo "✅ Colima already running. Showing status..."; \
-		$(MAKE) colima-status; \
-	else \
-		echo "🚀 Colima not running. Booting up (config.yaml)..."; \
-		$(MAKE) colima-start; \
-		$(MAKE) colima-status; \
-	fi
-
-colima-start:
-	@echo "🚀 Starting Colima using ~/.colima/default/config.yaml (colima start)..."
-	@colima start
-	@echo "✅ Colima start command finished."
-
-colima-start-custom:
-	@echo "🚀 Starting Colima with custom resources (cpu=$(COLIMA_CPU), memory=$(COLIMA_MEMORY)GB, disk=$(COLIMA_DISK)GB)..."
-	@colima start --cpu $(COLIMA_CPU) --memory $(COLIMA_MEMORY) --disk $(COLIMA_DISK)
-	@echo "✅ Colima custom start command finished."
-
-colima-status:
-	@echo "🧊 Checking Colima status..."
-	@colima status || echo "⚠️ Colima가 실행 중이 아닙니다."
-
-colima-stop:
-	@echo "🛑 Stopping Colima..."
-	@colima stop || echo "⚠️ Colima가 이미 중지 상태일 수 있습니다."
-	@echo "✅ Colima stop command finished."
-
-# ===============================
 # ✅ Preflight Checks
 # ===============================
+
+check-docker:
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "❌ Docker CLI를 찾을 수 없습니다."; \
+		echo "   시스템에 Docker 호환 런타임과 Docker CLI를 설치한 뒤 다시 실행하세요."; \
+		exit 1; \
+	fi
+	@if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then \
+		echo "❌ docker compose 또는 docker-compose를 찾을 수 없습니다."; \
+		echo "   Docker Compose를 사용할 수 있는 환경인지 확인하세요."; \
+		exit 1; \
+	fi
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "❌ Docker daemon에 연결할 수 없습니다."; \
+		echo "   시스템에서 Docker 호환 런타임을 실행한 뒤 다시 시도하세요."; \
+		exit 1; \
+	fi
+	@echo "✅ Docker runtime is available."
 
 check-env-secret:
 	@if [ -z "$(BLOG_ENV_SECRET)" ]; then \
@@ -156,6 +130,7 @@ check-repos:
 
 up:
 	@echo "🚀 Starting LOCAL containers (Octane direct on :4000)..."
+	@$(MAKE) check-docker
 	@$(MAKE) check-repos
 	$(MAKE) decrypt-docker-local
 	$(MAKE) decrypt-backend-local
@@ -173,25 +148,11 @@ down:
 # 🔁 Restart
 # ===============================
 
-restart-docker:
-	@echo "♻️ Restarting Docker runtime (Colima)..."
-	@if command -v colima >/dev/null 2>&1; then \
-		if colima status >/dev/null 2>&1; then \
-			colima restart || { echo "⚠️ colima restart failed, trying stop/start..."; colima stop && colima start; }; \
-		else \
-			echo "⚠️ Colima not running; starting Colima..."; \
-			colima start; \
-		fi; \
-		echo "✅ Docker runtime ready."; \
-	else \
-		echo "⚠️ Colima not found. Skipping runtime restart."; \
-	fi
-
 restart-all:
-	@echo "🔄 Restarting Docker runtime + ALL containers..."
-	@$(MAKE) restart-docker
+	@echo "🔄 Restarting ALL containers..."
+	@$(MAKE) check-docker
 	$(DC) -f $(COMPOSE_FILE) restart
-	@echo "✅ Docker runtime + all containers restarted."
+	@echo "✅ All containers restarted."
 
 restart-nextjs:
 	@echo "🔄 Restarting Next.js container..."
@@ -403,6 +364,7 @@ verify-env:
 	@echo "✅ Environment 확인 완료."
 
 status:
+	@$(MAKE) check-docker
 	@echo "\n🌍 BLOG SYSTEM STATUS REPORT"
 	@echo "──────────────────────────────────────────────"
 	@echo "📦 Docker Containers:"

@@ -24,17 +24,12 @@ blog/
 
 | 명령어 | 설명 |
 |--------|------|
-| `make colima` | Colima 런타임 자동 실행(이미 켜져 있으면 상태만 표시) |
-| `make colima-start` | `~/.colima/default/config.yaml` 기반으로 Colima 실행 |
-| `make colima-start-custom` | 환경변수로 지정한 리소스로 Colima 수동 실행 |
-| `make colima-status` | Colima 현재 상태 출력 |
-| `make colima-stop` | Colima 종료 |
 | `make up` | 로컬 컨테이너 실행 (Octane :4000) |
 | `make down` | 로컬 컨테이너 중지 및 정리 |
-| `make restart-docker` | Docker(Colima) 런타임 재시작 |
-| `make restart-all` | Docker 재시작 후 모든 컨테이너 재시작 |
+| `make restart-all` | 모든 컨테이너 재시작 |
 | `make build` | 이미지 캐시 없이 재빌드 |
 | `make status` | 컨테이너, 환경, env 상태 요약 표시 |
+| `make check-docker` | Docker 런타임 연결 상태 확인 |
 
 ---
 
@@ -135,47 +130,9 @@ Frontend .env → ../blog.frontend/.env (updated: 2025-10-10)
 ## 🧰 개발 환경 요구사항
 
 - macOS (zsh 환경)
-- Colima + Docker CLI (`brew install colima docker docker-compose`)
+- Docker 호환 런타임 + Docker CLI
 - Make (macOS 기본 내장)
 - OpenSSL (`brew install openssl`)
-
----
-
-## 🐧 Colima 기반 Docker 런타임
-
-며칠 전부터 Docker Desktop 대신 [Colima](https://github.com/abiosoft/colima)를 사용하도록 환경을 전환했습니다. `docker compose` 명령 자체는 그대로지만, Colima가 백그라운드에서 Docker 데몬을 제공하므로 make 명령을 실행하기 전에 Colima가 켜져 있어야 합니다.
-
-### 설치
-
-```bash
-brew install colima docker docker-compose
-```
-
-### 실행 / 상태 / 종료
-
-```bash
-colima start --cpu 4 --memory 8 --disk 60   # 자원 값은 필요에 맞게 조정
-colima status
-colima stop
-```
-
-필요 시 `colima nerdctl` 등을 활용해 개별 VM 자원을 재조정할 수 있으며, Colima가 실행 중일 때만 `make up` 명령이 정상 동작합니다.
-
-### Makefile 헬퍼
-
-Colima 제어용 Make 타겟을 제공하여 반복 작업을 줄일 수 있습니다.
-
-- `make colima` : Colima가 꺼져 있으면 config 기반 `colima start` 실행 후 상태 표시, 켜져 있으면 상태만 표시
-- `make colima-start` : `~/.colima/default/config.yaml` 설정대로 Colima 실행
-- `make colima-start-custom` : `COLIMA_CPU`/`COLIMA_MEMORY`/`COLIMA_DISK` 값으로 리소스를 지정해 Colima 실행
-- `make colima-status` : 현재 상태만 빠르게 확인
-- `make colima-stop` : Colima 종료
-
-커스텀 시작(target `colima-start-custom`)은 환경변수를 통해 리소스를 조절합니다. 기본값은 4·8·60이지만 필요 시 다음처럼 조정할 수 있습니다.
-
-```bash
-COLIMA_CPU=6 COLIMA_MEMORY=16 COLIMA_DISK=80 make colima-start-custom
-```
 
 ---
 
@@ -183,7 +140,7 @@ COLIMA_CPU=6 COLIMA_MEMORY=16 COLIMA_DISK=80 make colima-start-custom
 
 1. `blog.docker/.env.local.enc`, `blog.backend/.env.local.enc`, `blog.frontend/.env.local.enc` 준비
 2. `~/.zshrc` 에 `BLOG_ENV_SECRET` 추가 후 `source ~/.zshrc`
-3. `colima start` 로 Docker 런타임 실행 (최초 실행 후 계속 켜두면 됨)
+3. 시스템에서 Docker 호환 런타임 실행
 4. `cd blog.docker`
 5. `make up`
 6. 브라우저에서 `http://localhost:3000` (frontend), `http://localhost:4000` (backend) 확인
