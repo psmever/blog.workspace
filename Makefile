@@ -16,7 +16,7 @@ ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
 
 .PHONY: check-docker check-env-secret check-repos \
         up down \
-        build clean reset-docker \
+        build build-images clean reset-project \
         sh-laravel sh-nextjs artisan migrate seed yarn \
         logs laravel-log-clear laravel-log-error \
         env-encrypt-local env-encrypt-production \
@@ -45,9 +45,9 @@ help:
 	@echo "  make restart-mariadb     → MariaDB 컨테이너 재시작"
 	@echo ""
 	@echo "🧹 빌드 및 정리:"
-	@echo "  make build              → 로컬 이미지 재빌드"
+	@echo "  make reset-project      → clean + build + up + migrate + seed"
+	@echo "  make build              → 로컬 이미지 재빌드 후 migrate/seed 실행"
 	@echo "  make clean              → 모든 컨테이너/볼륨 정리"
-	@echo "  make reset-docker       → 관련 이미지·볼륨·네트워크 초기화"
 	@echo ""
 	@echo "🧩 개발 유틸리티:"
 	@echo "  make artisan route:list      → Laravel Artisan 임의 명령 실행"
@@ -59,7 +59,7 @@ help:
 	@echo "  make sh-nextjs          → Next.js 컨테이너 쉘 접속"
 	@echo ""
 	@echo "📜 로그:"
-	@echo "  make logs             → docker-compose 로그 tail + Octane 로그 tail (기본: laravel compose 로그 제외, SERVICE=이름 으로 단일 서비스 지정 가능)"
+	@echo "  make logs             → docker-compose 전체 로그 출력 (SERVICE=이름 으로 단일 서비스 지정 가능)"
 	@echo "  make laravel-log-clear  → Octane 로그 초기화"
 	@echo "  make laravel-log-error  → Octane 로그에서 ERROR 검색"
 	@echo ""
@@ -173,9 +173,17 @@ restart-mariadb:
 # 🧩 Build / Clean / Reset
 # ===============================
 
-build:
+build-images:
 	@echo "🔧 Building Docker images..."
+	@$(MAKE) check-docker
 	$(DOCKER_BUILD_ENV) $(DC) -f $(COMPOSE_FILE) build --no-cache
+
+build:
+	@$(MAKE) build-images
+	@echo "🗄️ Running migrations..."
+	@$(MAKE) migrate
+	@echo "🌱 Running seeders..."
+	@$(MAKE) seed
 
 clean:
 	@echo "🧹 Cleaning environment..."
@@ -183,13 +191,21 @@ clean:
 	rm -f $(BACKEND_DIR)/.env $(FRONTEND_DIR)/.env
 	@echo "✅ Clean complete."
 
-reset-docker:
-	@echo "🔥 Resetting all containers & images for this project..."
-	@$(DC) -f $(COMPOSE_FILE) down -v --remove-orphans || true
-	@docker image prune -af
-	@docker volume prune -f
-	@docker network prune -f
-	@echo "✅ Docker environment reset complete."
+reset-project:
+	@echo "♻️ Resetting this project from a clean state..."
+	@$(MAKE) clean
+	@$(MAKE) check-docker
+	@$(MAKE) check-repos
+	@$(MAKE) decrypt-docker-local
+	@$(MAKE) decrypt-backend-local
+	@$(MAKE) decrypt-frontend-local
+	@$(MAKE) build-images
+	@echo "🚀 Starting containers without rebuilding..."
+	APP_ENV=local NODE_ENV=development $(DC) -f $(COMPOSE_FILE) up -d
+	@echo "🗄️ Running migrations..."
+	@$(MAKE) migrate
+	@echo "🌱 Running seeders..."
+	@$(MAKE) seed
 
 # ===============================
 # 🧩 Laravel / Next.js Utilities
@@ -231,36 +247,10 @@ sh-nextjs:
 logs:
 	@if [ -n "$$SERVICE" ]; then \
 		echo "🧾 Viewing docker compose logs for service: $$SERVICE..."; \
-		$(DC) -f $(COMPOSE_FILE) logs -f --tail=100 $$SERVICE; \
+		$(DC) -f $(COMPOSE_FILE) logs -f --tail=all $$SERVICE; \
 	else \
-		excluded_service=laravel; \
-		echo "🧾 Viewing docker compose logs for all services (excluding $$excluded_service) + Laravel Octane log..."; \
-		services=$$($(DC) -f $(COMPOSE_FILE) config --services | grep -v "^$$excluded_service$$"); \
-		laravel_container=$$($(DC) -f $(COMPOSE_FILE) ps -q laravel); \
-		compose_pid=; \
-		octane_pid=; \
-		cleanup() { \
-			test -n "$$compose_pid" && kill "$$compose_pid" 2>/dev/null || true; \
-			test -n "$$octane_pid" && kill "$$octane_pid" 2>/dev/null || true; \
-		}; \
-		trap cleanup INT TERM EXIT; \
-		if [ -n "$$services" ]; then \
-			$(DC) -f $(COMPOSE_FILE) logs -f --tail=100 $$services & \
-			compose_pid=$$!; \
-		else \
-			echo "⚠️ No services to tail after applying exclusion."; \
-		fi; \
-		if [ -n "$$laravel_container" ]; then \
-			$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "tail -n 50 -f /var/log/octane.log" & \
-			octane_pid=$$!; \
-		else \
-			echo "⚠️ Laravel container not running. Skipping Octane log tail."; \
-		fi; \
-		if [ -z "$$compose_pid$$octane_pid" ]; then \
-			echo "⚠️ No log sources available."; \
-			exit 0; \
-		fi; \
-		wait; \
+		echo "🧾 Viewing full docker compose logs for all services..."; \
+		$(DC) -f $(COMPOSE_FILE) logs -f --tail=all; \
 	fi
 
 laravel-log-clear:

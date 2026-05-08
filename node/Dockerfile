@@ -6,12 +6,15 @@ ENV TZ=Asia/Seoul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
  && echo $TZ > /etc/timezone
 
-RUN corepack enable && corepack prepare yarn@4 --activate
+ENV HUSKY=0 \
+    COREPACK_HOME=/usr/local/share/corepack \
+    YARN_NODE_LINKER=node-modules
 
-# 의존성 캐시 최적화
-COPY package.json yarn.lock ./
-RUN yarn install || true
+RUN corepack enable && corepack prepare yarn@4.14.1 --activate
 
-# 소스는 볼륨으로 마운트되므로 빌드 단계 복사는 생략 가능
+RUN mkdir -p /usr/src/app/node_modules /usr/src/app/.next /home/node/.cache/yarn \
+ && mkdir -p /usr/local/share/corepack \
+ && chown -R node:node /usr/src/app /usr/local/share/corepack /home/node/.cache
+
 USER node
 EXPOSE 3000
