@@ -24,12 +24,19 @@ if [ ! -f /var/www/html/vendor/autoload.php ]; then
     composer install --no-interaction --prefer-dist
 fi
 
-# --- 최적화 캐시 초기화 ---
-php artisan optimize:clear || true
+# --- 로컬 migration registry 복구 ---
+if [ "${APP_ENV:-local}" = "local" ]; then
+    echo "🩹 Repairing local migration registry..."
+    php artisan migrations:repair-local --no-interaction
+fi
 
-# --- DB 마이그레이션 (비강제 실패 무시) ---
+# --- DB 마이그레이션 ---
 echo "🧩 Running migrations..."
-php artisan migrate --force || true
+php artisan migrate --force
+
+# --- 최적화 캐시 초기화 ---
+echo "🧹 Clearing bootstrap caches..."
+php artisan optimize:clear || true
 
 # --- Octane 실행 (백그라운드) ---
 echo "⚡ Starting Laravel Octane (Swoole) on port 4000..."
