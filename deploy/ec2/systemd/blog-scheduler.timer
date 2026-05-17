@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Jaubi Blog Scheduler every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+Unit=blog-scheduler.service
+
+[Install]
+WantedBy=timers.target

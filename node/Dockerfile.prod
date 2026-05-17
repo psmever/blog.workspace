@@ -1,0 +1,71 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /usr/src/app
+
+RUN apk add --no-cache tzdata
+
+ENV TZ=Asia/Seoul \
+    HUSKY=0 \
+    COREPACK_HOME=/usr/local/share/corepack \
+    YARN_NODE_LINKER=node-modules \
+    NEXT_TELEMETRY_DISABLED=1
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+ && echo $TZ > /etc/timezone \
+ && corepack enable \
+ && corepack prepare yarn@4.14.1 --activate
+
+COPY blog.frontend/package.json blog.frontend/yarn.lock blog.frontend/.yarnrc.yml ./
+
+RUN yarn install --immutable
+
+COPY blog.frontend ./
+
+ARG NEXT_PUBLIC_API_URL=http://localhost
+ARG NEXT_PUBLIC_API_BASE_CLIENT_HEADER_CODE=CT04P
+ARG NEXT_PUBLIC_APP_NAME=My Blog
+ARG NEXT_PUBLIC_APP_ENV=production
+ARG NEXT_PUBLIC_API_TIMEOUT=10000
+ARG NEXT_PUBLIC_DEBUG_MODE=false
+ARG NEXT_PUBLIC_SITE_URL=http://localhost
+
+ENV NODE_ENV=production \
+    NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    NEXT_PUBLIC_API_BASE_CLIENT_HEADER_CODE=${NEXT_PUBLIC_API_BASE_CLIENT_HEADER_CODE} \
+    NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME} \
+    NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV} \
+    NEXT_PUBLIC_API_TIMEOUT=${NEXT_PUBLIC_API_TIMEOUT} \
+    NEXT_PUBLIC_DEBUG_MODE=${NEXT_PUBLIC_DEBUG_MODE} \
+    NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+
+RUN yarn build
+
+FROM node:20-alpine AS runner
+
+WORKDIR /usr/src/app
+
+RUN apk add --no-cache tzdata
+
+ENV TZ=Asia/Seoul \
+    NODE_ENV=production \
+    PORT=3000 \
+    HUSKY=0 \
+    COREPACK_HOME=/usr/local/share/corepack \
+    YARN_NODE_LINKER=node-modules \
+    NEXT_TELEMETRY_DISABLED=1
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+ && echo $TZ > /etc/timezone \
+ && corepack enable \
+ && corepack prepare yarn@4.14.1 --activate
+
+COPY --from=builder /usr/src/app/package.json ./package.json
+COPY --from=builder /usr/src/app/yarn.lock ./yarn.lock
+COPY --from=builder /usr/src/app/.yarnrc.yml ./.yarnrc.yml
+COPY --from=builder /usr/src/app/public ./public
+COPY --from=builder /usr/src/app/.next ./.next
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+
+EXPOSE 3000
+
+CMD ["yarn", "start"]

@@ -1,0 +1,113 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      nextjs:
+        condition: service_healthy
+      laravel:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - laravel_storage:/var/www/backend-storage:ro
+    networks:
+      - blognet
+    restart: unless-stopped
+
+  nextjs:
+    build:
+      context: ..
+      dockerfile: blog.workspace/node/Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost}
+        NEXT_PUBLIC_API_BASE_CLIENT_HEADER_CODE: ${NEXT_PUBLIC_API_BASE_CLIENT_HEADER_CODE:-CT04P}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-My Blog}
+        NEXT_PUBLIC_APP_ENV: production
+        NEXT_PUBLIC_API_TIMEOUT: ${NEXT_PUBLIC_API_TIMEOUT:-10000}
+        NEXT_PUBLIC_DEBUG_MODE: ${NEXT_PUBLIC_DEBUG_MODE:-false}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost}
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost}
+      NEXT_PUBLIC_API_BASE_CLIENT_HEADER_CODE: ${NEXT_PUBLIC_API_BASE_CLIENT_HEADER_CODE:-CT04P}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-My Blog}
+      NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_API_TIMEOUT: ${NEXT_PUBLIC_API_TIMEOUT:-10000}
+      NEXT_PUBLIC_DEBUG_MODE: ${NEXT_PUBLIC_DEBUG_MODE:-false}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost}
+      TZ: Asia/Seoul
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ../blog.frontend/.env:/usr/src/app/.env:ro
+    expose:
+      - "3000"
+    networks:
+      - blognet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  laravel:
+    build:
+      context: ..
+      dockerfile: blog.workspace/php/Dockerfile.prod
+    environment:
+      APP_ENV: production
+      TZ: Asia/Seoul
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ../blog.backend/.env:/var/www/html/.env:ro
+      - laravel_storage:/var/www/html/storage
+    expose:
+      - "4000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - blognet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:4000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: ${DB_DATABASE:-blog}
+      MARIADB_USER: ${DB_USERNAME:-blog}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-blogpass}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-rootpass}
+      TZ: Asia/Seoul
+    volumes:
+      - dbdata:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - blognet
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'mariadb-admin ping -h 127.0.0.1 -uroot -p"$${MARIADB_ROOT_PASSWORD}" --silent',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+networks:
+  blognet:
+    driver: bridge
+
+volumes:
+  dbdata:
+  laravel_storage:

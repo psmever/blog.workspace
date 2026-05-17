@@ -1,0 +1,32 @@
+FROM php:8.3-cli-alpine
+
+RUN apk add --no-cache \
+    git unzip zip curl icu-dev libzip-dev openssl-dev autoconf g++ make oniguruma-dev brotli-dev \
+    && docker-php-ext-install pdo pdo_mysql mbstring intl zip bcmath pcntl \
+    && pecl install swoole \
+    && docker-php-ext-enable swoole \
+    && rm -rf /var/cache/apk/* /tmp/*
+
+RUN apk add --no-cache tzdata \
+    && ln -snf /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
+    && echo "Asia/Seoul" > /etc/timezone
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY blog.workspace/php/php.ini /usr/local/etc/php/conf.d/99-custom.ini
+
+WORKDIR /var/www/html
+
+COPY blog.backend /var/www/html
+
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chmod -R ug+rwx storage bootstrap/cache \
+    && export COMPOSER_ALLOW_SUPERUSER=1 \
+    && composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+COPY blog.workspace/php/entrypoint.prod.sh /usr/local/bin/entrypoint.sh
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 4000
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

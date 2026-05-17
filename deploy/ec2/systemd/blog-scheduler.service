@@ -1,0 +1,10 @@
+[Unit]
+Description=Jaubi Blog Scheduler (Laravel schedule:run)
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/var/www/jaubi.co.kr/blog/backend
+ExecStart=/usr/bin/php artisan schedule:run

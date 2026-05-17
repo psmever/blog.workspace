@@ -1,0 +1,19 @@
+[Unit]
+Description=Jaubi Blog Backend (Laravel Octane)
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/var/www/jaubi.co.kr/blog/backend
+Environment=APP_ENV=production
+Environment=LOG_CHANNEL=stack
+ExecStart=/usr/bin/php artisan octane:start --server=swoole --host=127.0.0.1 --port=4000 --workers=4 --max-requests=500
+ExecReload=/usr/bin/php artisan octane:reload
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
