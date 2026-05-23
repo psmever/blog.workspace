@@ -2,7 +2,7 @@ module.exports = {
     apps: [
         {
             name: "blog-frontend",
-            cwd: "/var/www/jaubi.co.kr/blog/frontend",
+            cwd: "/var/www/jaubi.co.kr/blog/blog.frontend",
             script: "./node_modules/next/dist/bin/next",
             args: "start -p 3000 -H 127.0.0.1",
             exec_mode: "fork",

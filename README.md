@@ -26,13 +26,9 @@ blog/
 |--------|------|
 | `make up` | 로컬 컨테이너 실행 (Octane :4000) |
 | `make down` | 로컬 컨테이너 중지 및 정리 |
-| `make prod-up` | 프로덕션 컨테이너 실행 (Nginx :80) |
-| `make prod-down` | 프로덕션 컨테이너 중지 |
 | `make restart-all` | 모든 컨테이너 재시작 |
 | `make build` | 이미지 캐시 없이 재빌드 |
-| `make prod-build` | 프로덕션 이미지 재빌드 |
 | `make status` | 컨테이너, 환경, env 상태 요약 표시 |
-| `make prod-status` | 프로덕션 compose 상태 표시 |
 | `make check-docker` | Docker 런타임 연결 상태 확인 |
 
 ---
@@ -47,15 +43,6 @@ blog/
 | `make decrypt-docker-local` | docker `.env.local.enc → .env` 복호화 |
 | `make decrypt-backend-local` | backend `.env.local.enc → .env` 복호화 |
 | `make decrypt-frontend-local` | frontend `.env.local.enc → .env` 복호화 |
-
-#### Production
-
-| 명령어 | 설명 |
-|--------|------|
-| `make env-encrypt-production` | docker/backend/frontend `.env → .env.production.enc` 암호화 |
-| `make decrypt-docker-production` | docker `.env.production.enc → .env` 복호화 |
-| `make decrypt-backend-production` | backend `.env.production.enc → .env` 복호화 |
-| `make decrypt-frontend-production` | frontend `.env.production.enc → .env` 복호화 |
 
 #### Common
 
@@ -90,7 +77,6 @@ export BLOG_ENV_SECRET="EKckuME1QJavOkoLE3ZlMOeqz8Kxzi4Jje7vyvms1s8="
 | `make laravel-log follow=true` | 실시간 로그 보기 (Ctrl+C 종료) |
 | `make laravel-log-clear` | Laravel 로그 파일 초기화 |
 | `make laravel-log-error` | `ERROR`만 필터링 출력 |
-| `make prod-logs` | 프로덕션 Docker Compose 로그 보기 |
 
 예시:
 ```bash
@@ -155,20 +141,20 @@ Frontend .env → ../blog.frontend/.env (updated: 2025-10-10)
 
 ## ☁️ AWS EC2 배포
 
-프로덕션 배포용 구성은 `docker-compose.prod.yml` 기준입니다.
+상용 배포는 EC2 직접 배포 기준으로 진행합니다.
 
-1. EC2 보안 그룹에서 `22/tcp`, `80/tcp`를 열기
-2. 인스턴스에 Docker Engine + Docker Compose Plugin 설치
-3. 서버에 `blog.backend`, `blog.frontend`, `blog.workspace`를 같은 부모 디렉터리에 clone
-4. 로컬에서 `blog.workspace/.env`, `blog.backend/.env`, `blog.frontend/.env`를 프로덕션 값으로 만든 뒤 `make env-encrypt-production`
-5. 서버에 `BLOG_ENV_SECRET` 설정
-6. `cd blog.workspace && make prod-up`
-7. `curl http://<퍼블릭IP>/api/health` 로 확인
+1. 서버 접속 직후 timezone을 `Asia/Seoul`로 설정
+2. EC2 보안 그룹에서 `22/tcp`, `80/tcp`, `443/tcp`를 열기
+3. 서버에 `Nginx`, `mariadb`, `PHP 8.3`, `Node 20`, `PM2`, `Certbot` 설치
+4. 서버에 `backend`, `frontend` 저장소 배치
+5. 프로덕션 환경 변수 반영
+6. `systemd`, `PM2`, `Nginx` 설정 적용
+7. HTTPS 발급 후 헬스체크 확인
+
+현재 운영 기준은 `/var/www/jaubi.co.kr/blog/{blog.backend,blog.frontend}` 구조와 `Laravel Octane/systemd + Next.js/PM2(nvm) + Nginx + Certbot` 입니다.
 
 상세 절차는 [docs/aws-ec2.md](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/docs/aws-ec2.md) 를 참고하세요.
-
-Docker 없이 EC2에 직접 배포할 경우에는 [docs/aws-ec2-no-docker.md](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/docs/aws-ec2-no-docker.md) 를 참고하세요.
-현재 상용 기준은 `/var/www/jaubi.co.kr/blog/{backend,frontend}` 구조와 `Laravel Octane/systemd + Next.js/PM2(nvm) + Nginx + Certbot` 입니다.
+빠른 순서 확인은 [docs/production-deployment-checklist.md](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/docs/production-deployment-checklist.md) 를 참고하세요.
 
 ---
 
