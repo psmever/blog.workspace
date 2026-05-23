@@ -247,10 +247,10 @@ AWS_BUCKET=...
 
 주의:
 
-- 새 인스턴스 재배포 시 `APP_KEY`는 반드시 새로 생성합니다. 기존 서버가 침해되었거나 env 암호화 키가 노출되었다면 기존 `APP_KEY`를 재사용하지 않습니다.
+- 새 인스턴스 재배포 시 `APP_KEY`는 반드시 새로 생성합니다. 기존 서버가 침해되었거나 환경 파일 노출 가능성이 있었다면 기존 `APP_KEY`를 재사용하지 않습니다.
 - `APP_KEY`는 Laravel 암호화, 쿠키, 서명 데이터의 루트 키입니다. 유출 가능성이 있으면 현재 세션/토큰을 모두 폐기하고, 필요한 경우 암호화 저장 데이터 영향도 확인 후 회전합니다.
-- 운영 `.env.production.enc`를 Git, iCloud, 문서 저장소에 올리지 않습니다. 운영 암호화 키는 `BLOG_ENV_PRODUCTION_SECRET`처럼 로컬 키와 분리해서 관리합니다.
-- 운영 env에는 `ADMIN_LOGIN_PASSWORD`, `DB_PASSWORD`, `AWS_SECRET_ACCESS_KEY`, `APP_KEY`가 함께 들어가므로, env 암호화 키가 노출되면 모두 유출된 것으로 간주합니다.
+- 운영 `.env`는 서버 또는 별도 Secret Manager에서만 관리하고 Git, 문서, 동기화 폴더에 올리지 않습니다.
+- 운영 env에는 `ADMIN_LOGIN_PASSWORD`, `DB_PASSWORD`, `AWS_SECRET_ACCESS_KEY`, `APP_KEY`가 함께 들어가므로 접근 권한을 최소화합니다.
 - 위 예시는 `CREATE USER 'blog'@'localhost'` 기준입니다.
 - `DB_HOST=127.0.0.1` 로 바꾸면 MariaDB에서는 `'blog'@'127.0.0.1'` 접속으로 처리될 수 있어서 권한 오류가 날 수 있습니다.
 - 같은 서버에서 붙는 기본 운영 기준은 `DB_HOST=localhost` 가 안전합니다.
