@@ -24,7 +24,7 @@ services:
       context: ./node
       dockerfile: Dockerfile
     working_dir: /usr/src/app
-    command: sh -lc "if [ ! -f node_modules/.yarn-state.yml ]; then yarn install; fi && yarn dev"
+    command: sh -lc "if [ ! -f node_modules/.yarn-state.yml ]; then yarn install --immutable; fi && yarn dev"
     environment:
       HUSKY: "0"
       NODE_OPTIONS: "--max-old-space-size=1024"
