@@ -48,12 +48,20 @@ blog/
 
 | 명령어 | 설명 |
 |--------|------|
-| `make backup-env` | 암호화된 env 파일을 iCloud에 백업 |
+| `make backup-env` | 암호화된 local env 파일 백업용. 운영 env에는 사용하지 않음 |
 
-🔑 암호화 키는 macOS `~/.zshrc` 에 설정:
+🔑 로컬 암호화 키는 macOS `~/.zshrc` 에 설정:
 ```bash
-export BLOG_ENV_SECRET="EKckuME1QJavOkoLE3ZlMOeqz8Kxzi4Jje7vyvms1s8="
+export BLOG_ENV_LOCAL_SECRET="$(openssl rand -base64 48)"
 ```
+
+운영 env 암호화 키는 로컬 키와 분리합니다. 문서, 저장소, iCloud 동기화 폴더에 남기지 말고 배포 작업을 수행하는 셸에서만 주입합니다.
+
+```bash
+export BLOG_ENV_PRODUCTION_SECRET="<password-manager-or-secrets-manager-value>"
+```
+
+이미 공유된 `BLOG_ENV_SECRET` 또는 같은 키로 암호화된 `.env.production.enc`가 있었다면 유출된 것으로 보고 폐기합니다. 새 운영 env는 새 `APP_KEY`, DB 비밀번호, 관리자 비밀번호, AWS 키를 발급한 뒤 `BLOG_ENV_PRODUCTION_SECRET`로 다시 암호화합니다.
 
 ---
 
@@ -91,7 +99,7 @@ make laravel-log tail=100 follow=true
 ~/Library/Mobile Documents/com~apple~CloudDocs/blog_envs/
 ```
 
-이 디렉토리에 `.env.*.enc` 파일이 자동 백업됩니다.
+이 디렉토리에는 로컬 개발용 `.env.local.enc`만 백업합니다. 운영용 `.env.production.enc`는 iCloud 동기화 대상에 두지 않습니다.
 
 ---
 
@@ -131,7 +139,7 @@ Frontend .env → ../blog.frontend/.env (updated: 2025-10-10)
 ## ✅ 초기 세팅 순서
 
 1. `blog.workspace/.env.local.enc`, `blog.backend/.env.local.enc`, `blog.frontend/.env.local.enc` 준비
-2. `~/.zshrc` 에 `BLOG_ENV_SECRET` 추가 후 `source ~/.zshrc`
+2. `~/.zshrc` 에 `BLOG_ENV_LOCAL_SECRET` 추가 후 `source ~/.zshrc`
 3. 시스템에서 Docker 호환 런타임 실행
 4. `cd blog.workspace`
 5. `make up`

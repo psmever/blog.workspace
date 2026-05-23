@@ -11,11 +11,14 @@ DOCKER_BUILD_ENV = DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0
 BACKEND_DIR = ../blog.backend
 FRONTEND_DIR = ../blog.frontend
 BLOG_ENV_SECRET ?= $(shell echo $$BLOG_ENV_SECRET)
+BLOG_ENV_LOCAL_SECRET ?= $(shell echo $$BLOG_ENV_LOCAL_SECRET)
+BLOG_ENV_PRODUCTION_SECRET ?= $(shell echo $$BLOG_ENV_PRODUCTION_SECRET)
+LOCAL_ENV_SECRET = $(if $(BLOG_ENV_LOCAL_SECRET),$(BLOG_ENV_LOCAL_SECRET),$(BLOG_ENV_SECRET))
 ARTISAN_GOALS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
 .DEFAULT_GOAL := help
 
-.PHONY: check-docker check-env-secret check-repos \
+.PHONY: check-docker check-env-secret check-local-env-secret check-production-env-secret check-repos \
         up down prod-up prod-down \
         build build-images clean reset-project \
         prod-build prod-logs prod-status \
@@ -87,9 +90,10 @@ help:
 	@echo "  make verify-env         → 컨테이너 환경변수 확인"
 	@echo "  make status             → 도커 상태 리포트"
 	@echo "  make prod-status        → 프로덕션 compose 상태 리포트"
-	@echo "  make backup-env         → 암호화된 env 파일 iCloud 백업"
+	@echo "  make backup-env         → 로컬 암호화 env 파일 iCloud 백업"
 	@echo "  make check-repos        → 필수 repo 경로 확인"
-	@echo "  make check-env-secret   → BLOG_ENV_SECRET 설정 확인"
+	@echo "  make check-local-env-secret      → 로컬 env 암호화 키 설정 확인"
+	@echo "  make check-production-env-secret → 운영 env 암호화 키 설정 확인"
 	@echo ""
 	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
 
@@ -119,6 +123,20 @@ check-env-secret:
 	@if [ -z "$(BLOG_ENV_SECRET)" ]; then \
 		echo "❌ BLOG_ENV_SECRET이 설정되어 있지 않습니다."; \
 		echo "   사용 중인 쉘 설정 파일(~/.zshrc, ~/.bashrc 등)에 export BLOG_ENV_SECRET=... 추가 후 다시 실행하세요."; \
+		exit 1; \
+	fi
+
+check-local-env-secret:
+	@if [ -z "$(LOCAL_ENV_SECRET)" ]; then \
+		echo "❌ 로컬 env 암호화 키가 설정되어 있지 않습니다."; \
+		echo "   BLOG_ENV_LOCAL_SECRET을 설정하세요. 기존 로컬 호환이 필요하면 BLOG_ENV_SECRET도 사용할 수 있습니다."; \
+		exit 1; \
+	fi
+
+check-production-env-secret:
+	@if [ -z "$(BLOG_ENV_PRODUCTION_SECRET)" ]; then \
+		echo "❌ 운영 env 암호화 키 BLOG_ENV_PRODUCTION_SECRET이 설정되어 있지 않습니다."; \
+		echo "   운영 키는 로컬 키와 분리하고, 문서/저장소/iCloud 동기화 대상에 넣지 마세요."; \
 		exit 1; \
 	fi
 
@@ -306,97 +324,97 @@ laravel-log-error:
 # 🔐 Encrypt / Decrypt ENV
 # ===============================
 
-env-encrypt-local: check-env-secret
+env-encrypt-local: check-local-env-secret
 	@echo "🔐 Encrypting docker .env → .env.local.enc..."
 	@if [ -f ./.env ]; then \
 		openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in ./.env -out ./.env.local.enc -k "$(BLOG_ENV_SECRET)"; \
+			-in ./.env -out ./.env.local.enc -k "$(LOCAL_ENV_SECRET)"; \
 		echo "✅ Docker .env.local.enc 생성 완료."; \
 	else echo "⚠️  Docker .env not found."; fi
 	@echo "🔐 Encrypting backend .env → .env.local.enc..."
 	@if [ -f $(BACKEND_DIR)/.env ]; then \
 		cd $(BACKEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in .env -out .env.local.enc -k "$(BLOG_ENV_SECRET)"; \
+			-in .env -out .env.local.enc -k "$(LOCAL_ENV_SECRET)"; \
 		echo "✅ Backend .env.local.enc 생성 완료."; \
 	else echo "⚠️  Backend .env not found."; fi
 	@echo "🔐 Encrypting frontend .env → .env.local.enc..."
 	@if [ -f $(FRONTEND_DIR)/.env ]; then \
 		cd $(FRONTEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in .env -out .env.local.enc -k "$(BLOG_ENV_SECRET)"; \
+			-in .env -out .env.local.enc -k "$(LOCAL_ENV_SECRET)"; \
 		echo "✅ Frontend .env.local.enc 생성 완료."; \
 	else echo "⚠️  Frontend .env not found."; fi
 
-env-encrypt-production: check-env-secret
+env-encrypt-production: check-production-env-secret
 	@echo "🔐 Encrypting docker .env → .env.production.enc..."
 	@if [ -f ./.env ]; then \
 		openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in ./.env -out ./.env.production.enc -k "$(BLOG_ENV_SECRET)"; \
+			-in ./.env -out ./.env.production.enc -k "$(BLOG_ENV_PRODUCTION_SECRET)"; \
 		echo "✅ Docker .env.production.enc 생성 완료."; \
 	else echo "⚠️  Docker .env not found."; fi
 	@echo "🔐 Encrypting backend .env → .env.production.enc..."
 	@if [ -f $(BACKEND_DIR)/.env ]; then \
 		cd $(BACKEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in .env -out .env.production.enc -k "$(BLOG_ENV_SECRET)"; \
+			-in .env -out .env.production.enc -k "$(BLOG_ENV_PRODUCTION_SECRET)"; \
 		echo "✅ Backend .env.production.enc 생성 완료."; \
 	else echo "⚠️  Backend .env not found."; fi
 	@echo "🔐 Encrypting frontend .env → .env.production.enc..."
 	@if [ -f $(FRONTEND_DIR)/.env ]; then \
 		cd $(FRONTEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in .env -out .env.production.enc -k "$(BLOG_ENV_SECRET)"; \
+			-in .env -out .env.production.enc -k "$(BLOG_ENV_PRODUCTION_SECRET)"; \
 		echo "✅ Frontend .env.production.enc 생성 완료."; \
 	else echo "⚠️  Frontend .env not found."; fi
 
-decrypt-docker-local: check-env-secret
+decrypt-docker-local: check-local-env-secret
 	@echo "🔓 Decrypting docker .env.local.enc..."
 	@if [ -f ./.env.local.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
 			-in ./.env.local.enc \
-			-out ./.env -k "$(BLOG_ENV_SECRET)"; \
+			-out ./.env -k "$(LOCAL_ENV_SECRET)"; \
 		echo "✅ Docker .env.local.enc 복호화 완료."; \
 	else echo "⚠️  Docker .env.local.enc not found."; fi
 
-decrypt-backend-local: check-env-secret
+decrypt-backend-local: check-local-env-secret
 	@echo "🔓 Decrypting backend .env.local.enc..."
 	@if [ -f $(BACKEND_DIR)/.env.local.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
 			-in $(BACKEND_DIR)/.env.local.enc \
-			-out $(BACKEND_DIR)/.env -k "$(BLOG_ENV_SECRET)"; \
+			-out $(BACKEND_DIR)/.env -k "$(LOCAL_ENV_SECRET)"; \
 		echo "✅ Backend .env.local.enc 복호화 완료."; \
 	else echo "⚠️  Backend .env.local.enc not found."; fi
 
-decrypt-docker-production: check-env-secret
+decrypt-docker-production: check-production-env-secret
 	@echo "🔓 Decrypting docker .env.production.enc..."
 	@if [ -f ./.env.production.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
 			-in ./.env.production.enc \
-			-out ./.env -k "$(BLOG_ENV_SECRET)"; \
+			-out ./.env -k "$(BLOG_ENV_PRODUCTION_SECRET)"; \
 		echo "✅ Docker .env.production.enc 복호화 완료."; \
 	else echo "⚠️  Docker .env.production.enc not found."; fi
 
-decrypt-backend-production: check-env-secret
+decrypt-backend-production: check-production-env-secret
 	@echo "🔓 Decrypting backend .env.production.enc..."
 	@if [ -f $(BACKEND_DIR)/.env.production.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
 			-in $(BACKEND_DIR)/.env.production.enc \
-			-out $(BACKEND_DIR)/.env -k "$(BLOG_ENV_SECRET)"; \
+			-out $(BACKEND_DIR)/.env -k "$(BLOG_ENV_PRODUCTION_SECRET)"; \
 		echo "✅ Backend .env.production.enc 복호화 완료."; \
 	else echo "⚠️  Backend .env.production.enc not found."; fi
 
-decrypt-frontend-local: check-env-secret
+decrypt-frontend-local: check-local-env-secret
 	@echo "🔓 Decrypting frontend .env.local.enc..."
 	@if [ -f $(FRONTEND_DIR)/.env.local.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
 			-in $(FRONTEND_DIR)/.env.local.enc \
-			-out $(FRONTEND_DIR)/.env -k "$(BLOG_ENV_SECRET)"; \
+			-out $(FRONTEND_DIR)/.env -k "$(LOCAL_ENV_SECRET)"; \
 		echo "✅ Frontend .env.local.enc 복호화 완료."; \
 	else echo "⚠️  Frontend .env.local.enc not found."; fi
 
-decrypt-frontend-production: check-env-secret
+decrypt-frontend-production: check-production-env-secret
 	@echo "🔓 Decrypting frontend .env.production.enc..."
 	@if [ -f $(FRONTEND_DIR)/.env.production.enc ]; then \
 		openssl enc -d -aes-256-cbc -pbkdf2 \
 			-in $(FRONTEND_DIR)/.env.production.enc \
-			-out $(FRONTEND_DIR)/.env -k "$(BLOG_ENV_SECRET)"; \
+			-out $(FRONTEND_DIR)/.env -k "$(BLOG_ENV_PRODUCTION_SECRET)"; \
 		echo "✅ Frontend .env.production.enc 복호화 완료."; \
 	else echo "⚠️  Frontend .env.production.enc not found."; fi
 
@@ -432,7 +450,7 @@ prod-status:
 
 backup-env:
 	@mkdir -p ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs
-	cp -v ./.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
-	cp -v $(BACKEND_DIR)/.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
-	cp -v $(FRONTEND_DIR)/.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
-	@echo "✅ Encrypted envs backed up to iCloud."
+	cp -v ./.env.local.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
+	cp -v $(BACKEND_DIR)/.env.local.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
+	cp -v $(FRONTEND_DIR)/.env.local.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
+	@echo "✅ Local encrypted envs backed up to iCloud."

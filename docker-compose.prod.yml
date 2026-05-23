@@ -85,8 +85,8 @@ services:
     environment:
       MARIADB_DATABASE: ${DB_DATABASE:-blog}
       MARIADB_USER: ${DB_USERNAME:-blog}
-      MARIADB_PASSWORD: ${DB_PASSWORD:-blogpass}
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-rootpass}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?set MARIADB_ROOT_PASSWORD}
       TZ: Asia/Seoul
     volumes:
       - dbdata:/var/lib/mysql

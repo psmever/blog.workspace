@@ -4,6 +4,7 @@
 .LSOverride
 
 .env
+.env*.enc
 /.fleet
 /.idea
 /.vscode
