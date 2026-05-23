@@ -24,19 +24,22 @@ if [ ! -f /var/www/html/vendor/autoload.php ]; then
     composer install --no-interaction --prefer-dist
 fi
 
-# --- 로컬 migration registry 복구 ---
+# --- 로컬 환경은 명시적으로 artisan migrate 실행 ---
 if [ "${APP_ENV:-local}" = "local" ]; then
-    echo "🩹 Repairing local migration registry..."
-    php artisan migrations:repair-local --no-interaction
+    echo "⏭️ Skipping startup migrations in local environment."
+    echo "   Run './scripts/artisan.sh migrate' when you need to apply migrations."
+else
+    echo "🧩 Running migrations..."
+    php artisan migrate --force
 fi
 
-# --- DB 마이그레이션 ---
-echo "🧩 Running migrations..."
-php artisan migrate --force
-
 # --- 최적화 캐시 초기화 ---
-echo "🧹 Clearing bootstrap caches..."
-php artisan optimize:clear || true
+if [ "${APP_ENV:-local}" = "local" ]; then
+    echo "⏭️ Skipping startup optimize:clear in local environment."
+else
+    echo "🧹 Clearing bootstrap caches..."
+    php artisan optimize:clear || true
+fi
 
 # --- Octane 실행 (백그라운드) ---
 echo "⚡ Starting Laravel Octane (Swoole) on port 4000..."
