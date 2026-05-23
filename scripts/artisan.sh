@@ -19,10 +19,19 @@ fi
 # 실행 중인 laravel 컨테이너 ID 확인
 LARAVEL_CONTAINER=$("${DC_CMD[@]}" -f "$COMPOSE_FILE" ps -q $SERVICE_NAME || true)
 
-if [ -n "$LARAVEL_CONTAINER" ] && [ "$(docker inspect -f '{{.State.Running}}' "$LARAVEL_CONTAINER" 2>/dev/null)" = "true" ]; then
-  echo "🚀 Executing artisan command in running $SERVICE_NAME container..."
-  "${DC_CMD[@]}" -f "$COMPOSE_FILE" exec $SERVICE_NAME php artisan "$@"
-else
-  echo "⚙️ Laravel container not running — starting temporary container..."
-  "${DC_CMD[@]}" -f "$COMPOSE_FILE" run --rm $SERVICE_NAME php artisan "$@"
+run_in_container() {
+  if [ -n "$LARAVEL_CONTAINER" ] && [ "$(docker inspect -f '{{.State.Running}}' "$LARAVEL_CONTAINER" 2>/dev/null)" = "true" ]; then
+    echo "🚀 Executing artisan command in running $SERVICE_NAME container..."
+    "${DC_CMD[@]}" -f "$COMPOSE_FILE" exec $SERVICE_NAME php artisan "$@"
+  else
+    echo "⚙️ Laravel container not running — starting temporary container..."
+    "${DC_CMD[@]}" -f "$COMPOSE_FILE" run --rm $SERVICE_NAME php artisan "$@"
+  fi
+}
+
+if [ "$#" -gt 0 ] && [ "$1" = "migrate" ]; then
+  echo "🩹 Repairing local migration registry before migrate..."
+  run_in_container migrations:repair-local --no-interaction || true
 fi
+
+run_in_container "$@"

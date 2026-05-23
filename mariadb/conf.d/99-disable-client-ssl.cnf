@@ -1,0 +1,3 @@
+[client]
+skip-ssl
+skip-ssl-verify-server-cert

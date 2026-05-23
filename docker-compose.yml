@@ -61,6 +61,7 @@ services:
     volumes:
       - dbdata:/var/lib/mysql
       - /etc/localtime:/etc/localtime:ro
+      - ./mariadb/conf.d/99-disable-client-ssl.cnf:/etc/mysql/conf.d/99-disable-client-ssl.cnf:ro
     ports:
       - "13306:3306"
     networks:
