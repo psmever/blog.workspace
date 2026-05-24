@@ -6,27 +6,21 @@
 # (v2가 없으면 v1 명령으로 fallback)
 DC = $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
 COMPOSE_FILE = ./docker-compose.yml
-COMPOSE_PROD_FILE = ./docker-compose.prod.yml
 DOCKER_BUILD_ENV = DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0
 BACKEND_DIR = ../blog.backend
 FRONTEND_DIR = ../blog.frontend
-BLOG_ENV_SECRET ?= $(shell echo $$BLOG_ENV_SECRET)
 ARTISAN_GOALS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
 .DEFAULT_GOAL := help
 
-.PHONY: check-docker check-env-secret check-repos \
-        up down prod-up prod-down \
+.PHONY: check-docker check-env-files check-repos \
+        up down \
         build build-images clean reset-project \
-        prod-build prod-logs prod-status \
         sh-laravel sh-nextjs artisan migrate seed yarn \
         logs laravel-log-clear laravel-log-error \
-        env-encrypt-local env-encrypt-production \
-        decrypt-docker-local decrypt-backend-local decrypt-backend-production \
-        decrypt-docker-production decrypt-frontend-local decrypt-frontend-production \
         restart-all \
         restart-laravel restart-nextjs restart-mariadb \
-        status verify-env backup-env help
+        status verify-env help
 
 ifeq ($(firstword $(MAKECMDGOALS)),artisan)
 %:
@@ -39,8 +33,6 @@ help:
 	@echo "🎬 실행 및 종료:"
 	@echo "  make up                → 로컬 컨테이너 실행 (Octane :4000)"
 	@echo "  make down              → 로컬 컨테이너 중지 및 정리"
-	@echo "  make prod-up           → 프로덕션 컨테이너 실행 (Nginx :80)"
-	@echo "  make prod-down         → 프로덕션 컨테이너 중지"
 	@echo ""
 	@echo "🔁 재시작:"
 	@echo "  make restart-all         → 모든 컨테이너 재시작"
@@ -49,9 +41,8 @@ help:
 	@echo "  make restart-mariadb     → MariaDB 컨테이너 재시작"
 	@echo ""
 	@echo "🧹 빌드 및 정리:"
-	@echo "  make reset-project      → clean + build + up + migrate + seed"
+	@echo "  make reset-project      → 모든 컨테이너/볼륨 정리"
 	@echo "  make build              → 로컬 이미지 재빌드 후 migrate/seed 실행"
-	@echo "  make prod-build         → 프로덕션 이미지 재빌드"
 	@echo "  make clean              → 모든 컨테이너/볼륨 정리"
 	@echo ""
 	@echo "🧩 개발 유틸리티:"
@@ -65,31 +56,15 @@ help:
 	@echo ""
 	@echo "📜 로그:"
 	@echo "  make logs             → docker-compose 전체 로그 출력 (SERVICE=이름 으로 단일 서비스 지정 가능)"
-	@echo "  make prod-logs        → 프로덕션 compose 로그 출력"
 	@echo "  make laravel-log-clear  → Octane 로그 초기화"
 	@echo "  make laravel-log-error  → Octane 로그에서 ERROR 검색"
 	@echo ""
-	@echo "🔐 ENV 암·복호화:"
-	@echo "  [LOCAL]"
-	@echo "  make env-encrypt-local          → docker/backend/frontend .env → .env.local.enc"
-	@echo "  make decrypt-docker-local       → docker .env.local.enc → .env"
-	@echo "  make decrypt-backend-local      → backend .env.local.enc → .env"
-	@echo "  make decrypt-frontend-local     → frontend .env.local.enc → .env"
-	@echo ""
-	@echo "  [PRODUCTION]"
-	@echo "  make env-encrypt-production     → docker/backend/frontend .env → .env.production.enc"
-	@echo "  make decrypt-docker-production  → docker .env.production.enc → .env"
-	@echo "  make decrypt-backend-production → backend .env.production.enc → .env"
-	@echo "  make decrypt-frontend-production → frontend .env.production.enc → .env"
-	@echo ""
-	@echo "🧠 상태 및 백업:"
+	@echo "🧠 상태:"
 	@echo "  make check-docker     → Docker 런타임 연결 상태 확인"
+	@echo "  make check-env-files  → 수동 관리 .env 파일 존재 확인"
 	@echo "  make verify-env         → 컨테이너 환경변수 확인"
 	@echo "  make status             → 도커 상태 리포트"
-	@echo "  make prod-status        → 프로덕션 compose 상태 리포트"
-	@echo "  make backup-env         → 암호화된 env 파일 iCloud 백업"
 	@echo "  make check-repos        → 필수 repo 경로 확인"
-	@echo "  make check-env-secret   → BLOG_ENV_SECRET 설정 확인"
 	@echo ""
 	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
 
@@ -115,16 +90,23 @@ check-docker:
 	fi
 	@echo "✅ Docker runtime is available."
 
-check-env-secret:
-	@if [ -z "$(BLOG_ENV_SECRET)" ]; then \
-		echo "❌ BLOG_ENV_SECRET이 설정되어 있지 않습니다."; \
-		echo "   사용 중인 쉘 설정 파일(~/.zshrc, ~/.bashrc 등)에 export BLOG_ENV_SECRET=... 추가 후 다시 실행하세요."; \
-		exit 1; \
-	fi
-
 check-repos:
 	@if [ ! -d "$(BACKEND_DIR)" ]; then \
 		echo "❌ 백엔드 경로가 없습니다: $(BACKEND_DIR)"; \
+		exit 1; \
+	fi
+
+check-env-files:
+	@if [ ! -f ./.env ]; then \
+		echo "❌ workspace .env 파일이 없습니다. .env.example을 참고해 직접 작성하세요."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(BACKEND_DIR)/.env" ]; then \
+		echo "❌ backend .env 파일이 없습니다. $(BACKEND_DIR)/.env.example을 참고해 직접 작성하세요."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(FRONTEND_DIR)/.env" ]; then \
+		echo "❌ frontend .env 파일이 없습니다. $(FRONTEND_DIR)/.env.local.example을 참고해 직접 작성하세요."; \
 		exit 1; \
 	fi
 	@if [ ! -d "$(FRONTEND_DIR)" ]; then \
@@ -140,33 +122,14 @@ up:
 	@echo "🚀 Starting LOCAL containers (Octane direct on :4000)..."
 	@$(MAKE) check-docker
 	@$(MAKE) check-repos
-	$(MAKE) decrypt-docker-local
-	$(MAKE) decrypt-backend-local
-	$(MAKE) decrypt-frontend-local
+	@$(MAKE) check-env-files
 	$(DOCKER_BUILD_ENV) APP_ENV=local NODE_ENV=development $(DC) -f $(COMPOSE_FILE) up -d --build
 	@echo "✅ Local containers running (Octane direct on :4000)"
 
 down:
 	@echo "🛑 Stopping LOCAL containers..."
 	$(DC) -f $(COMPOSE_FILE) down -v
-	rm -f $(BACKEND_DIR)/.env $(FRONTEND_DIR)/.env
 	@echo "✅ Local containers stopped."
-
-prod-up:
-	@echo "🚀 Starting PRODUCTION containers..."
-	@$(MAKE) check-docker
-	@$(MAKE) check-repos
-	$(MAKE) decrypt-docker-production
-	$(MAKE) decrypt-backend-production
-	$(MAKE) decrypt-frontend-production
-	$(DOCKER_BUILD_ENV) APP_ENV=production NODE_ENV=production $(DC) -f $(COMPOSE_PROD_FILE) up -d --build
-	@echo "✅ Production containers running (Nginx on :80)"
-
-prod-down:
-	@echo "🛑 Stopping PRODUCTION containers..."
-	$(DC) -f $(COMPOSE_PROD_FILE) down
-	rm -f ./.env $(BACKEND_DIR)/.env $(FRONTEND_DIR)/.env
-	@echo "✅ Production containers stopped."
 
 # ===============================
 # 🔁 Restart
@@ -209,36 +172,15 @@ build:
 	@echo "🌱 Running seeders..."
 	@$(MAKE) seed
 
-prod-build:
-	@echo "🔧 Building PRODUCTION images..."
-	@$(MAKE) check-docker
-	@$(MAKE) check-repos
-	$(MAKE) decrypt-docker-production
-	$(MAKE) decrypt-backend-production
-	$(MAKE) decrypt-frontend-production
-	$(DOCKER_BUILD_ENV) APP_ENV=production NODE_ENV=production $(DC) -f $(COMPOSE_PROD_FILE) build --no-cache
-
 clean:
 	@echo "🧹 Cleaning environment..."
 	$(DC) -f $(COMPOSE_FILE) down -v || true
-	rm -f $(BACKEND_DIR)/.env $(FRONTEND_DIR)/.env
 	@echo "✅ Clean complete."
 
 reset-project:
-	@echo "♻️ Resetting this project from a clean state..."
+	@echo "♻️ Resetting this project..."
 	@$(MAKE) clean
-	@$(MAKE) check-docker
-	@$(MAKE) check-repos
-	@$(MAKE) decrypt-docker-local
-	@$(MAKE) decrypt-backend-local
-	@$(MAKE) decrypt-frontend-local
-	@$(MAKE) build-images
-	@echo "🚀 Starting containers without rebuilding..."
-	APP_ENV=local NODE_ENV=development $(DC) -f $(COMPOSE_FILE) up -d
-	@echo "🗄️ Running migrations..."
-	@$(MAKE) migrate
-	@echo "🌱 Running seeders..."
-	@$(MAKE) seed
+	@echo "✅ Project reset complete."
 
 # ===============================
 # 🧩 Laravel / Next.js Utilities
@@ -286,15 +228,6 @@ logs:
 		$(DC) -f $(COMPOSE_FILE) logs -f --tail=all; \
 	fi
 
-prod-logs:
-	@if [ -n "$$SERVICE" ]; then \
-		echo "🧾 Viewing production logs for service: $$SERVICE..."; \
-		$(DC) -f $(COMPOSE_PROD_FILE) logs -f --tail=all $$SERVICE; \
-	else \
-		echo "🧾 Viewing full production logs..."; \
-		$(DC) -f $(COMPOSE_PROD_FILE) logs -f --tail=all; \
-	fi
-
 laravel-log-clear:
 	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "echo '' > /var/log/octane.log"
 	@echo "✅ Octane log cleared."
@@ -303,105 +236,7 @@ laravel-log-error:
 	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "grep -i 'ERROR' /var/log/octane.log || echo 'No errors found ✅'"
 
 # ===============================
-# 🔐 Encrypt / Decrypt ENV
-# ===============================
-
-env-encrypt-local: check-env-secret
-	@echo "🔐 Encrypting docker .env → .env.local.enc..."
-	@if [ -f ./.env ]; then \
-		openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in ./.env -out ./.env.local.enc -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Docker .env.local.enc 생성 완료."; \
-	else echo "⚠️  Docker .env not found."; fi
-	@echo "🔐 Encrypting backend .env → .env.local.enc..."
-	@if [ -f $(BACKEND_DIR)/.env ]; then \
-		cd $(BACKEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in .env -out .env.local.enc -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Backend .env.local.enc 생성 완료."; \
-	else echo "⚠️  Backend .env not found."; fi
-	@echo "🔐 Encrypting frontend .env → .env.local.enc..."
-	@if [ -f $(FRONTEND_DIR)/.env ]; then \
-		cd $(FRONTEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in .env -out .env.local.enc -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Frontend .env.local.enc 생성 완료."; \
-	else echo "⚠️  Frontend .env not found."; fi
-
-env-encrypt-production: check-env-secret
-	@echo "🔐 Encrypting docker .env → .env.production.enc..."
-	@if [ -f ./.env ]; then \
-		openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in ./.env -out ./.env.production.enc -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Docker .env.production.enc 생성 완료."; \
-	else echo "⚠️  Docker .env not found."; fi
-	@echo "🔐 Encrypting backend .env → .env.production.enc..."
-	@if [ -f $(BACKEND_DIR)/.env ]; then \
-		cd $(BACKEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in .env -out .env.production.enc -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Backend .env.production.enc 생성 완료."; \
-	else echo "⚠️  Backend .env not found."; fi
-	@echo "🔐 Encrypting frontend .env → .env.production.enc..."
-	@if [ -f $(FRONTEND_DIR)/.env ]; then \
-		cd $(FRONTEND_DIR) && openssl enc -aes-256-cbc -pbkdf2 -salt \
-			-in .env -out .env.production.enc -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Frontend .env.production.enc 생성 완료."; \
-	else echo "⚠️  Frontend .env not found."; fi
-
-decrypt-docker-local: check-env-secret
-	@echo "🔓 Decrypting docker .env.local.enc..."
-	@if [ -f ./.env.local.enc ]; then \
-		openssl enc -d -aes-256-cbc -pbkdf2 \
-			-in ./.env.local.enc \
-			-out ./.env -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Docker .env.local.enc 복호화 완료."; \
-	else echo "⚠️  Docker .env.local.enc not found."; fi
-
-decrypt-backend-local: check-env-secret
-	@echo "🔓 Decrypting backend .env.local.enc..."
-	@if [ -f $(BACKEND_DIR)/.env.local.enc ]; then \
-		openssl enc -d -aes-256-cbc -pbkdf2 \
-			-in $(BACKEND_DIR)/.env.local.enc \
-			-out $(BACKEND_DIR)/.env -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Backend .env.local.enc 복호화 완료."; \
-	else echo "⚠️  Backend .env.local.enc not found."; fi
-
-decrypt-docker-production: check-env-secret
-	@echo "🔓 Decrypting docker .env.production.enc..."
-	@if [ -f ./.env.production.enc ]; then \
-		openssl enc -d -aes-256-cbc -pbkdf2 \
-			-in ./.env.production.enc \
-			-out ./.env -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Docker .env.production.enc 복호화 완료."; \
-	else echo "⚠️  Docker .env.production.enc not found."; fi
-
-decrypt-backend-production: check-env-secret
-	@echo "🔓 Decrypting backend .env.production.enc..."
-	@if [ -f $(BACKEND_DIR)/.env.production.enc ]; then \
-		openssl enc -d -aes-256-cbc -pbkdf2 \
-			-in $(BACKEND_DIR)/.env.production.enc \
-			-out $(BACKEND_DIR)/.env -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Backend .env.production.enc 복호화 완료."; \
-	else echo "⚠️  Backend .env.production.enc not found."; fi
-
-decrypt-frontend-local: check-env-secret
-	@echo "🔓 Decrypting frontend .env.local.enc..."
-	@if [ -f $(FRONTEND_DIR)/.env.local.enc ]; then \
-		openssl enc -d -aes-256-cbc -pbkdf2 \
-			-in $(FRONTEND_DIR)/.env.local.enc \
-			-out $(FRONTEND_DIR)/.env -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Frontend .env.local.enc 복호화 완료."; \
-	else echo "⚠️  Frontend .env.local.enc not found."; fi
-
-decrypt-frontend-production: check-env-secret
-	@echo "🔓 Decrypting frontend .env.production.enc..."
-	@if [ -f $(FRONTEND_DIR)/.env.production.enc ]; then \
-		openssl enc -d -aes-256-cbc -pbkdf2 \
-			-in $(FRONTEND_DIR)/.env.production.enc \
-			-out $(FRONTEND_DIR)/.env -k "$(BLOG_ENV_SECRET)"; \
-		echo "✅ Frontend .env.production.enc 복호화 완료."; \
-	else echo "⚠️  Frontend .env.production.enc not found."; fi
-
-# ===============================
-# 🧠 System Status & Backup
+# 🧠 System Status
 # ===============================
 
 verify-env:
@@ -422,17 +257,3 @@ status:
 	@echo "Frontend .env →"
 	@[ -f $(FRONTEND_DIR)/.env ] && stat -f "%N (updated: %SB)" -t "%Y-%m-%d %H:%M" $(FRONTEND_DIR)/.env || echo "❌ Not Found"
 	@echo "──────────────────────────────────────────────"
-
-prod-status:
-	@$(MAKE) check-docker
-	@echo "\n🌍 BLOG PRODUCTION STATUS REPORT"
-	@echo "──────────────────────────────────────────────"
-	@$(DC) -f $(COMPOSE_PROD_FILE) ps
-	@echo "──────────────────────────────────────────────"
-
-backup-env:
-	@mkdir -p ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs
-	cp -v ./.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
-	cp -v $(BACKEND_DIR)/.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
-	cp -v $(FRONTEND_DIR)/.env.*.enc ~/Library/Mobile\ Documents/com~apple~CloudDocs/blog_envs/ 2>/dev/null || true
-	@echo "✅ Encrypted envs backed up to iCloud."
