@@ -197,10 +197,5 @@ load_node_toolchain() {
 }
 
 run_yarn() {
-    if command -v yarn >/dev/null 2>&1; then
-        yarn "$@"
-        return
-    fi
-
     corepack yarn "$@"
 }
