@@ -6,7 +6,6 @@
 # (v2가 없으면 v1 명령으로 fallback)
 DC = $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
 COMPOSE_FILE = ./docker-compose.yml
-COMPOSE_PROD_FILE = ./docker-compose.prod.yml
 DOCKER_BUILD_ENV = DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0
 BACKEND_DIR = ../blog.backend
 FRONTEND_DIR = ../blog.frontend
@@ -15,9 +14,8 @@ ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
 .DEFAULT_GOAL := help
 
 .PHONY: check-docker check-env-files check-repos \
-        up down prod-up prod-down \
+        up down \
         build build-images clean reset-project \
-        prod-build prod-logs prod-status \
         sh-laravel sh-nextjs artisan migrate seed yarn \
         logs laravel-log-clear laravel-log-error \
         restart-all \
@@ -35,8 +33,6 @@ help:
 	@echo "🎬 실행 및 종료:"
 	@echo "  make up                → 로컬 컨테이너 실행 (Octane :4000)"
 	@echo "  make down              → 로컬 컨테이너 중지 및 정리"
-	@echo "  make prod-up           → 프로덕션 컨테이너 실행 (Nginx :80)"
-	@echo "  make prod-down         → 프로덕션 컨테이너 중지"
 	@echo ""
 	@echo "🔁 재시작:"
 	@echo "  make restart-all         → 모든 컨테이너 재시작"
@@ -45,9 +41,8 @@ help:
 	@echo "  make restart-mariadb     → MariaDB 컨테이너 재시작"
 	@echo ""
 	@echo "🧹 빌드 및 정리:"
-	@echo "  make reset-project      → clean + build + up + migrate + seed"
+	@echo "  make reset-project      → 모든 컨테이너/볼륨 정리"
 	@echo "  make build              → 로컬 이미지 재빌드 후 migrate/seed 실행"
-	@echo "  make prod-build         → 프로덕션 이미지 재빌드"
 	@echo "  make clean              → 모든 컨테이너/볼륨 정리"
 	@echo ""
 	@echo "🧩 개발 유틸리티:"
@@ -61,7 +56,6 @@ help:
 	@echo ""
 	@echo "📜 로그:"
 	@echo "  make logs             → docker-compose 전체 로그 출력 (SERVICE=이름 으로 단일 서비스 지정 가능)"
-	@echo "  make prod-logs        → 프로덕션 compose 로그 출력"
 	@echo "  make laravel-log-clear  → Octane 로그 초기화"
 	@echo "  make laravel-log-error  → Octane 로그에서 ERROR 검색"
 	@echo ""
@@ -70,7 +64,6 @@ help:
 	@echo "  make check-env-files  → 수동 관리 .env 파일 존재 확인"
 	@echo "  make verify-env         → 컨테이너 환경변수 확인"
 	@echo "  make status             → 도커 상태 리포트"
-	@echo "  make prod-status        → 프로덕션 compose 상태 리포트"
 	@echo "  make check-repos        → 필수 repo 경로 확인"
 	@echo ""
 	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
@@ -138,19 +131,6 @@ down:
 	$(DC) -f $(COMPOSE_FILE) down -v
 	@echo "✅ Local containers stopped."
 
-prod-up:
-	@echo "🚀 Starting PRODUCTION containers..."
-	@$(MAKE) check-docker
-	@$(MAKE) check-repos
-	@$(MAKE) check-env-files
-	$(DOCKER_BUILD_ENV) APP_ENV=production NODE_ENV=production $(DC) -f $(COMPOSE_PROD_FILE) up -d --build
-	@echo "✅ Production containers running (Nginx on :80)"
-
-prod-down:
-	@echo "🛑 Stopping PRODUCTION containers..."
-	$(DC) -f $(COMPOSE_PROD_FILE) down
-	@echo "✅ Production containers stopped."
-
 # ===============================
 # 🔁 Restart
 # ===============================
@@ -192,31 +172,15 @@ build:
 	@echo "🌱 Running seeders..."
 	@$(MAKE) seed
 
-prod-build:
-	@echo "🔧 Building PRODUCTION images..."
-	@$(MAKE) check-docker
-	@$(MAKE) check-repos
-	@$(MAKE) check-env-files
-	$(DOCKER_BUILD_ENV) APP_ENV=production NODE_ENV=production $(DC) -f $(COMPOSE_PROD_FILE) build --no-cache
-
 clean:
 	@echo "🧹 Cleaning environment..."
 	$(DC) -f $(COMPOSE_FILE) down -v || true
 	@echo "✅ Clean complete."
 
 reset-project:
-	@echo "♻️ Resetting this project from a clean state..."
+	@echo "♻️ Resetting this project..."
 	@$(MAKE) clean
-	@$(MAKE) check-docker
-	@$(MAKE) check-repos
-	@$(MAKE) check-env-files
-	@$(MAKE) build-images
-	@echo "🚀 Starting containers without rebuilding..."
-	APP_ENV=local NODE_ENV=development $(DC) -f $(COMPOSE_FILE) up -d
-	@echo "🗄️ Running migrations..."
-	@$(MAKE) migrate
-	@echo "🌱 Running seeders..."
-	@$(MAKE) seed
+	@echo "✅ Project reset complete."
 
 # ===============================
 # 🧩 Laravel / Next.js Utilities
@@ -264,15 +228,6 @@ logs:
 		$(DC) -f $(COMPOSE_FILE) logs -f --tail=all; \
 	fi
 
-prod-logs:
-	@if [ -n "$$SERVICE" ]; then \
-		echo "🧾 Viewing production logs for service: $$SERVICE..."; \
-		$(DC) -f $(COMPOSE_PROD_FILE) logs -f --tail=all $$SERVICE; \
-	else \
-		echo "🧾 Viewing full production logs..."; \
-		$(DC) -f $(COMPOSE_PROD_FILE) logs -f --tail=all; \
-	fi
-
 laravel-log-clear:
 	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "echo '' > /var/log/octane.log"
 	@echo "✅ Octane log cleared."
@@ -301,11 +256,4 @@ status:
 	@[ -f $(BACKEND_DIR)/.env ] && stat -f "%N (updated: %SB)" -t "%Y-%m-%d %H:%M" $(BACKEND_DIR)/.env || echo "❌ Not Found"
 	@echo "Frontend .env →"
 	@[ -f $(FRONTEND_DIR)/.env ] && stat -f "%N (updated: %SB)" -t "%Y-%m-%d %H:%M" $(FRONTEND_DIR)/.env || echo "❌ Not Found"
-	@echo "──────────────────────────────────────────────"
-
-prod-status:
-	@$(MAKE) check-docker
-	@echo "\n🌍 BLOG PRODUCTION STATUS REPORT"
-	@echo "──────────────────────────────────────────────"
-	@$(DC) -f $(COMPOSE_PROD_FILE) ps
 	@echo "──────────────────────────────────────────────"
