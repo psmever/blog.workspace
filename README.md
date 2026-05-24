@@ -1,7 +1,7 @@
 # 🧰 Blog Workspace Development Environment
 
 Laravel (Backend) + Next.js (Frontend) + MariaDB
-로컬 개발을 위한 Docker 환경이며, `.env` 파일을 암호화하여 관리할 수 있습니다.
+로컬 개발을 위한 Docker 환경입니다. `.env` 파일은 예시 파일을 기준으로 각 환경에서 직접 작성하고 Git에 커밋하지 않습니다.
 
 ---
 
@@ -33,27 +33,17 @@ blog/
 
 ---
 
-### 🔐 환경 파일 관리 (.env)
+### 환경 파일 관리 (.env)
 
-#### Local
+`.env` 파일은 자동 생성하지 않습니다. 값이 변경될 때마다 아래 예시 파일을 기준으로 각 환경의 `.env`를 직접 수정합니다.
 
-| 명령어 | 설명 |
-|--------|------|
-| `make env-encrypt-local` | docker/backend/frontend `.env → .env.local.enc` 암호화 |
-| `make decrypt-docker-local` | docker `.env.local.enc → .env` 복호화 |
-| `make decrypt-backend-local` | backend `.env.local.enc → .env` 복호화 |
-| `make decrypt-frontend-local` | frontend `.env.local.enc → .env` 복호화 |
+| 위치 | 기준 파일 | 실제 파일 |
+|--------|------|------|
+| workspace | `.env.example` | `blog.workspace/.env` |
+| backend | `blog.backend/.env.example` | `blog.backend/.env` |
+| frontend | `blog.frontend/.env.local.example` | `blog.frontend/.env` |
 
-#### Common
-
-| 명령어 | 설명 |
-|--------|------|
-| `make backup-env` | 암호화된 env 파일을 iCloud에 백업 |
-
-🔑 암호화 키는 macOS `~/.zshrc` 에 설정:
-```bash
-export BLOG_ENV_SECRET="EKckuME1QJavOkoLE3ZlMOeqz8Kxzi4Jje7vyvms1s8="
-```
+운영 환경 변수는 서버의 실제 `.env` 또는 별도 Secret Manager에서만 관리합니다. 실제 환경 파일, 운영 키, 비밀번호는 Git, 문서, 동기화 폴더에 두지 않습니다.
 
 ---
 
@@ -82,16 +72,6 @@ export BLOG_ENV_SECRET="EKckuME1QJavOkoLE3ZlMOeqz8Kxzi4Jje7vyvms1s8="
 ```bash
 make laravel-log tail=100 follow=true
 ```
-
----
-
-### ☁️ iCloud 백업 경로
-
-```
-~/Library/Mobile Documents/com~apple~CloudDocs/blog_envs/
-```
-
-이 디렉토리에 `.env.*.enc` 파일이 자동 백업됩니다.
 
 ---
 
@@ -124,18 +104,18 @@ Frontend .env → ../blog.frontend/.env (updated: 2025-10-10)
 - macOS (zsh 환경)
 - Docker 호환 런타임 + Docker CLI
 - Make (macOS 기본 내장)
-- OpenSSL (`brew install openssl`)
 
 ---
 
 ## ✅ 초기 세팅 순서
 
-1. `blog.workspace/.env.local.enc`, `blog.backend/.env.local.enc`, `blog.frontend/.env.local.enc` 준비
-2. `~/.zshrc` 에 `BLOG_ENV_SECRET` 추가 후 `source ~/.zshrc`
-3. 시스템에서 Docker 호환 런타임 실행
-4. `cd blog.workspace`
-5. `make up`
-6. 브라우저에서 `http://localhost:3000` (frontend), `http://localhost:4000` (backend) 확인
+1. `blog.workspace/.env.example`을 참고해 `blog.workspace/.env`를 직접 작성
+2. `blog.backend/.env.example`을 참고해 `blog.backend/.env`를 직접 작성
+3. `blog.frontend/.env.local.example`을 참고해 `blog.frontend/.env`를 직접 작성
+4. 시스템에서 Docker 호환 런타임 실행
+5. `cd blog.workspace`
+6. `make up`
+7. 브라우저에서 `http://localhost:3000` (frontend), `http://localhost:4000` (backend) 확인
 
 ---
 
@@ -165,7 +145,6 @@ Frontend .env → ../blog.frontend/.env (updated: 2025-10-10)
 | `blog.backend` | Laravel 11.x |
 | `blog.frontend` | Next.js 14 |
 | `blog.workspace` | 공용 개발/배포 워크스페이스 |
-| `scripts/` | 초기화 및 유틸 스크립트 |
 | `Makefile` | 전반적 제어 중심 |
 
 ---

@@ -54,6 +54,9 @@
 
 ## 최종 점검
 
+- 새 인스턴스 기준으로 `APP_KEY`, `DB_PASSWORD`, `ADMIN_LOGIN_PASSWORD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 모두 새 값으로 교체
+- 운영 `.env`는 서버 또는 Secret Manager에서만 수동 관리
+- 실제 `.env`가 Git 추적 대상이 아닌지 확인
 - `systemctl status blog-backend`
 - `systemctl status blog-scheduler.timer`
 - `pm2 status`
