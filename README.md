@@ -137,8 +137,9 @@ Frontend .env → ../blog.frontend/.env (updated: 2025-10-10)
 - 빠른 실행 체크리스트: [docs/production-deployment-checklist.md](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/docs/production-deployment-checklist.md)
 - 운영 기준: `backend`, `frontend` 모두 서버 저장소의 `main` 브랜치만 pull 해서 배포하며, 둘 다 반영할 때는 `backend -> frontend` 순서로 진행
 - 기본 명령: `make deploy-sync`, `make deploy-backend`, `make deploy-frontend`, `make deploy-all`, `make deploy-status`
+- 배포 성공 후 로컬 래퍼가 `../blog.backend`, `../blog.frontend` 에 `deploy/prod/<app>/<timestamp>` Git tag를 생성하고 `origin` 으로 push
 - PM2 실행 기준 파일: `blog.frontend/ecosystem.config.cjs`
-- `scripts/deploy-prod.sh` 는 `make deploy-*` 가 호출하는 내부 래퍼이며, 필요하면 서버에서 `/opt/deploy/blog/*.sh` 를 직접 실행할 수도 있음
+- `scripts/deploy-prod.sh` 는 `make deploy-*` 가 호출하는 내부 래퍼이며, 필요하면 서버에서 `/opt/deploy/blog/*.sh` 를 직접 실행할 수도 있음. 다만 Git tag 자동 생성은 로컬 `make deploy-*` 경로에서만 수행됨
 
 ---
 

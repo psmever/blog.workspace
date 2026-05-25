@@ -64,6 +64,7 @@
 - frontend만 배포: `make deploy-frontend`
 - 둘 다 배포: `make deploy-all`
 - 마지막 배포 상태 확인: `make deploy-status`
+- 각 배포가 성공하면 로컬 래퍼가 `deploy/prod/<app>/<timestamp>` Git tag를 해당 앱 저장소 `origin` 으로 push
 
 ```bash
 make deploy-sync
@@ -74,6 +75,7 @@ make deploy-status
 ```
 
 - 내부 구현은 [scripts/deploy-prod.sh](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/scripts/deploy-prod.sh:1) 가 맡고, 필요하면 서버에서 `/opt/deploy/blog/deploy-backend.sh`, `/opt/deploy/blog/deploy-frontend.sh`, `/opt/deploy/blog/deploy-all.sh`, `/opt/deploy/blog/deploy-status.sh` 를 직접 실행할 수도 있습니다.
+- Git 배포 태그 자동 생성은 로컬 `make deploy-*` 경로에서만 수행됩니다.
 
 ## 최종 점검
 

@@ -165,12 +165,12 @@ sync_repo_to_branch() {
 
 record_deploy_state() {
     local component=$1
-    local requested_ref=$2
+    local deploy_branch=$2
     local commit_sha=$3
     local state_file="${BLOG_STATE_DIR}/${component}.last_deploy"
 
     cat > "$state_file" <<EOF
-requested_ref=$requested_ref
+deploy_branch=$deploy_branch
 commit_sha=$commit_sha
 deployed_at=$(date -Iseconds)
 EOF

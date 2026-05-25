@@ -45,6 +45,7 @@
 - 전체 반영이 필요할 때의 기본 순서는 `backend -> frontend` 입니다.
 - `deploy-backend.sh`, `deploy-frontend.sh`, `deploy-all.sh` 는 인자를 받지 않고 각 저장소의 `main` 브랜치를 반영합니다.
 - 배포 스크립트가 바뀌면 먼저 `make deploy-sync` 로 서버 `/opt/deploy/blog` 를 갱신합니다.
+- `make deploy-backend`, `make deploy-frontend`, `make deploy-all` 이 성공하면 로컬 래퍼가 앱 저장소 `origin` 에 `deploy/prod/<app>/<timestamp>` annotated tag를 자동 push 합니다.
 - PM2 실행 기준 파일은 서버의 `blog.frontend/ecosystem.config.cjs` 입니다.
 
 ## 전체 순서
@@ -708,6 +709,13 @@ make deploy-all
 make deploy-status
 ```
 
+자동 태그:
+
+- `make deploy-backend` 성공 시 `../blog.backend` 에 `deploy/prod/backend/<timestamp>` 태그를 생성하고 `origin` 으로 push 합니다.
+- `make deploy-frontend` 성공 시 `../blog.frontend` 에 `deploy/prod/frontend/<timestamp>` 태그를 생성하고 `origin` 으로 push 합니다.
+- `make deploy-all` 은 같은 timestamp로 backend/frontend 태그를 각각 생성합니다.
+- 배포는 성공했지만 태그 생성 또는 push가 실패하면 명령은 실패로 끝나며, 배포 자체는 롤백하지 않습니다.
+
 서버에서 직접 실행해야 할 때:
 
 ```bash
@@ -720,6 +728,7 @@ make deploy-status
 참고:
 
 - 로컬 `make deploy-*` 는 내부적으로 [scripts/deploy-prod.sh](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/scripts/deploy-prod.sh:1) 를 호출합니다.
+- Git 배포 태그 자동 생성은 로컬 `make deploy-*` 경로에서만 수행됩니다. 서버에서 `/opt/deploy/blog/*.sh` 를 직접 실행하면 태그는 남지 않습니다.
 
 ## 15. 운영 메모
 
