@@ -58,6 +58,9 @@ services:
     build:
       context: ..
       dockerfile: blog.workspace/php/Dockerfile.prod
+      args:
+        PHP_BASE_IMAGE: ${PHP_CLI_BASE_IMAGE:-php:8.5.4-cli-alpine}
+        SWOOLE_VERSION: ${PHP_SWOOLE_VERSION:-6.2.1}
     environment:
       APP_ENV: production
       TZ: Asia/Seoul

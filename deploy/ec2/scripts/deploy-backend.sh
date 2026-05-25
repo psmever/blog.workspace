@@ -10,19 +10,17 @@ trap 'trap_err "${LINENO}" "${BASH_COMMAND}" "$?"' ERR
 usage() {
     cat <<'EOF'
 사용법:
-  ./deploy-backend.sh <tag-or-sha>
+  ./deploy-backend.sh
 
 예시:
-  ./deploy-backend.sh v2026.05.21-1
-  ./deploy-backend.sh 8f42ab1
+  ./deploy-backend.sh
 EOF
 }
 
 main() {
-    local requested_ref=${1:-}
     local resolved_commit
 
-    [ -n "$requested_ref" ] || {
+    [ $# -eq 0 ] || {
         usage
         exit 1
     }
@@ -33,15 +31,13 @@ main() {
     require_dir "$BLOG_BACKEND_DIR"
     require_file "$BLOG_BACKEND_DIR/.env"
 
-    log "backend 배포 시작: ref=$requested_ref"
+    log "backend 배포 시작: branch=${BLOG_DEPLOY_BRANCH}"
 
     sanitize_laravel_cache_state "$BLOG_BACKEND_DIR"
     ensure_git_worktree_clean "$BLOG_BACKEND_DIR"
-    fetch_origin "$BLOG_BACKEND_DIR"
-    resolved_commit=$(resolve_ref "$BLOG_BACKEND_DIR" "$requested_ref")
+    resolved_commit=$(sync_repo_to_branch "$BLOG_BACKEND_DIR" "$BLOG_DEPLOY_BRANCH")
 
     log "배포 커밋: $resolved_commit"
-    checkout_commit "$BLOG_BACKEND_DIR" "$resolved_commit"
 
     cd "$BLOG_BACKEND_DIR"
 
@@ -64,7 +60,7 @@ main() {
         -H "Host: ${BLOG_PUBLIC_BACKEND_HOST}" \
         -H "Client-Type: ${BLOG_CLIENT_TYPE}"
 
-    record_deploy_state "backend" "$requested_ref" "$resolved_commit"
+    record_deploy_state "backend" "$BLOG_DEPLOY_BRANCH" "$resolved_commit"
     log "backend 배포 완료"
 }
 

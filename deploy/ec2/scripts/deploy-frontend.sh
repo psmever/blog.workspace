@@ -10,11 +10,10 @@ trap 'trap_err "${LINENO}" "${BASH_COMMAND}" "$?"' ERR
 usage() {
     cat <<'EOF'
 사용법:
-  ./deploy-frontend.sh <tag-or-sha>
+  ./deploy-frontend.sh
 
 예시:
-  ./deploy-frontend.sh v2026.05.21-1
-  ./deploy-frontend.sh 8f42ab1
+  ./deploy-frontend.sh
 EOF
 }
 
@@ -29,10 +28,9 @@ restart_frontend() {
 }
 
 main() {
-    local requested_ref=${1:-}
     local resolved_commit
 
-    [ -n "$requested_ref" ] || {
+    [ $# -eq 0 ] || {
         usage
         exit 1
     }
@@ -45,14 +43,12 @@ main() {
     require_file "$BLOG_FRONTEND_DIR/.env"
     require_file "$BLOG_FRONTEND_DIR/ecosystem.config.cjs"
 
-    log "frontend 배포 시작: ref=$requested_ref"
+    log "frontend 배포 시작: branch=${BLOG_DEPLOY_BRANCH}"
 
     ensure_git_worktree_clean "$BLOG_FRONTEND_DIR"
-    fetch_origin "$BLOG_FRONTEND_DIR"
-    resolved_commit=$(resolve_ref "$BLOG_FRONTEND_DIR" "$requested_ref")
+    resolved_commit=$(sync_repo_to_branch "$BLOG_FRONTEND_DIR" "$BLOG_DEPLOY_BRANCH")
 
     log "배포 커밋: $resolved_commit"
-    checkout_commit "$BLOG_FRONTEND_DIR" "$resolved_commit"
 
     cd "$BLOG_FRONTEND_DIR"
 
@@ -66,7 +62,7 @@ main() {
         "$BLOG_FRONTEND_PROXY_HEALTH_URL" \
         -H "Host: ${BLOG_PUBLIC_FRONTEND_HOST}"
 
-    record_deploy_state "frontend" "$requested_ref" "$resolved_commit"
+    record_deploy_state "frontend" "$BLOG_DEPLOY_BRANCH" "$resolved_commit"
     log "frontend 배포 완료"
 }
 

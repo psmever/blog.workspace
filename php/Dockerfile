@@ -1,17 +1,39 @@
-FROM php:8.3-fpm-alpine
+ARG PHP_BASE_IMAGE=php:8.5.4-cli-alpine
+
+FROM ${PHP_BASE_IMAGE}
+
+ARG SWOOLE_VERSION=6.2.1
 
 # 필수 패키지 및 확장 설치
 RUN apk add --no-cache \
-    git unzip zip curl icu-dev libzip-dev openssl-dev autoconf g++ make oniguruma-dev brotli-dev \
-    && docker-php-ext-install pdo pdo_mysql mbstring intl zip bcmath pcntl \
-    && pecl install swoole \
+    $PHPIZE_DEPS curl git icu-dev libzip-dev linux-headers openssl-dev \
+    tzdata unzip zip \
+    && docker-php-ext-install bcmath intl pcntl pdo_mysql sockets zip \
+    && printf '%s\n' \
+        'yes' \
+        '' \
+        '' \
+        '' \
+        '' \
+        'no' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+    | pecl install swoole-${SWOOLE_VERSION} \
     && docker-php-ext-enable swoole \
-    && rm -rf /var/cache/apk/* /tmp/*
-
-# 타임존 설정
-RUN apk add --no-cache tzdata \
     && ln -snf /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
-    && echo "Asia/Seoul" > /etc/timezone
+    && echo "Asia/Seoul" > /etc/timezone \
+    && rm -rf /tmp/pear /var/cache/apk/*
 
 # Composer 복사
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

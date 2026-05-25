@@ -11,6 +11,7 @@ BACKEND_DIR = ../blog.backend
 FRONTEND_DIR = ../blog.frontend
 ARTISAN_GOALS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
+DEPLOY_SCRIPT = ./scripts/deploy-prod.sh
 .DEFAULT_GOAL := help
 
 .PHONY: check-docker check-env-files check-repos \
@@ -20,7 +21,8 @@ ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
         logs laravel-log-clear laravel-log-error \
         restart-all \
         restart-laravel restart-nextjs restart-mariadb \
-        status verify-env help
+        status verify-env help \
+        deploy-sync deploy-backend deploy-frontend deploy-all deploy-status
 
 ifeq ($(firstword $(MAKECMDGOALS)),artisan)
 %:
@@ -65,6 +67,13 @@ help:
 	@echo "  make verify-env         → 컨테이너 환경변수 확인"
 	@echo "  make status             → 도커 상태 리포트"
 	@echo "  make check-repos        → 필수 repo 경로 확인"
+	@echo ""
+	@echo "☁️ 상용 배포:"
+	@echo "  make deploy-sync       → 서버 /opt/deploy/blog 배포 스크립트 동기화"
+	@echo "  make deploy-backend    → 서버 blog.backend main 브랜치 pull 배포"
+	@echo "  make deploy-frontend   → 서버 blog.frontend main 브랜치 pull 배포"
+	@echo "  make deploy-all        → backend -> frontend 순서로 main 브랜치 배포"
+	@echo "  make deploy-status     → 서버 마지막 배포 상태/헬스체크 확인"
 	@echo ""
 	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
 
@@ -257,3 +266,22 @@ status:
 	@echo "Frontend .env →"
 	@[ -f $(FRONTEND_DIR)/.env ] && stat -f "%N (updated: %SB)" -t "%Y-%m-%d %H:%M" $(FRONTEND_DIR)/.env || echo "❌ Not Found"
 	@echo "──────────────────────────────────────────────"
+
+# ===============================
+# ☁️ Production Deploy
+# ===============================
+
+deploy-sync:
+	$(DEPLOY_SCRIPT) sync
+
+deploy-backend:
+	$(DEPLOY_SCRIPT) backend
+
+deploy-frontend:
+	$(DEPLOY_SCRIPT) frontend
+
+deploy-all:
+	$(DEPLOY_SCRIPT) all
+
+deploy-status:
+	$(DEPLOY_SCRIPT) status

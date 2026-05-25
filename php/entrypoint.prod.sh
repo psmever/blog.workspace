@@ -13,6 +13,13 @@ fi
 mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
 chmod -R ug+rwx storage bootstrap/cache || true
 
+echo "🔎 Checking Composer platform requirements..."
+if ! composer check-platform-reqs; then
+    echo "❌ Composer platform requirements 확인에 실패했습니다."
+    echo "   운영 이미지를 PHP 8.5로 유지하려면 blog.backend composer.lock 이 먼저 PHP 8.5와 호환되어야 합니다."
+    exit 1
+fi
+
 echo "🧩 Running migrations..."
 php artisan migrate --force
 

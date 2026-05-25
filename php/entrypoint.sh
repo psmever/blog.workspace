@@ -21,7 +21,18 @@ fi
 if [ ! -f /var/www/html/vendor/autoload.php ]; then
     echo "📦 Installing composer dependencies..."
     export COMPOSER_ALLOW_SUPERUSER=1
-    composer install --no-interaction --prefer-dist
+    if ! composer install --no-interaction --prefer-dist; then
+        echo "❌ composer install 이 실패했습니다."
+        echo "   PHP 8.5 이미지에서 nette/schema 또는 php 8.1 - 8.4 오류가 보이면 blog.backend composer.lock 갱신이 먼저 필요합니다."
+        exit 1
+    fi
+fi
+
+echo "🔎 Checking Composer platform requirements..."
+if ! composer check-platform-reqs; then
+    echo "❌ Composer platform requirements 확인에 실패했습니다."
+    echo "   현재 blog.backend 의존성 또는 vendor 상태가 PHP 8.5 workspace 이미지와 맞지 않습니다."
+    exit 1
 fi
 
 # --- 로컬 환경은 명시적으로 artisan migrate 실행 ---

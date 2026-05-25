@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 : "${BLOG_DEPLOY_ROOT:=/opt/deploy/blog}"
+: "${BLOG_DEPLOY_BRANCH:=main}"
 : "${BLOG_BACKEND_DIR:=/var/www/jaubi.co.kr/blog/blog.backend}"
 : "${BLOG_FRONTEND_DIR:=/var/www/jaubi.co.kr/blog/blog.frontend}"
 : "${BLOG_LOG_DIR:=${BLOG_DEPLOY_ROOT}/logs}"
@@ -114,33 +115,52 @@ sanitize_laravel_cache_state() {
     fi
 }
 
-fetch_origin() {
+fetch_origin_branch() {
     local repo_dir=$1
+    local branch=${2:-$BLOG_DEPLOY_BRANCH}
 
-    git -C "$repo_dir" fetch --prune --tags origin
+    git -C "$repo_dir" fetch --prune origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
 }
 
-resolve_ref() {
+checkout_branch() {
     local repo_dir=$1
-    local ref=$2
-    local resolved=""
+    local branch=${2:-$BLOG_DEPLOY_BRANCH}
 
-    resolved=$(git -C "$repo_dir" rev-parse --verify --quiet "${ref}^{commit}" || true)
-
-    if [ -z "$resolved" ]; then
-        resolved=$(git -C "$repo_dir" rev-parse --verify --quiet "origin/${ref}^{commit}" || true)
+    if git -C "$repo_dir" show-ref --verify --quiet "refs/heads/${branch}"; then
+        git -C "$repo_dir" checkout "$branch"
+    else
+        git -C "$repo_dir" checkout -b "$branch" --track "origin/${branch}"
     fi
-
-    [ -n "$resolved" ] || die "배포 ref를 찾을 수 없습니다: $ref"
-
-    printf '%s\n' "$resolved"
 }
 
-checkout_commit() {
+fast_forward_branch() {
     local repo_dir=$1
-    local commit_sha=$2
+    local branch=${2:-$BLOG_DEPLOY_BRANCH}
 
-    git -C "$repo_dir" checkout --detach "$commit_sha"
+    git -C "$repo_dir" merge --ff-only "origin/${branch}"
+}
+
+ensure_branch_not_ahead() {
+    local repo_dir=$1
+    local branch=${2:-$BLOG_DEPLOY_BRANCH}
+    local counts=""
+    local ahead_count=""
+
+    counts=$(git -C "$repo_dir" rev-list --left-right --count "${branch}...origin/${branch}")
+    ahead_count=${counts%%[[:space:]]*}
+
+    [ "$ahead_count" = "0" ] || die "서버 ${branch} 브랜치가 origin/${branch} 보다 앞서 있습니다. 먼저 정리하세요: $repo_dir"
+}
+
+sync_repo_to_branch() {
+    local repo_dir=$1
+    local branch=${2:-$BLOG_DEPLOY_BRANCH}
+
+    fetch_origin_branch "$repo_dir" "$branch"
+    checkout_branch "$repo_dir" "$branch"
+    ensure_branch_not_ahead "$repo_dir" "$branch"
+    fast_forward_branch "$repo_dir" "$branch"
+    git -C "$repo_dir" rev-parse HEAD
 }
 
 record_deploy_state() {
