@@ -90,27 +90,11 @@ ensure_git_worktree_clean() {
 
 sanitize_laravel_cache_state() {
     local repo_dir=$1
-    local tracked_restore_paths=()
-    local tracked_path
-
-    for tracked_path in \
-        bootstrap/cache/packages.php \
-        bootstrap/cache/services.php
-    do
-        if git -C "$repo_dir" ls-files --error-unmatch "$tracked_path" >/dev/null 2>&1; then
-            tracked_restore_paths+=("$tracked_path")
-        fi
-    done
-
-    if [ "${#tracked_restore_paths[@]}" -gt 0 ]; then
-        log "Laravel bootstrap cache tracked 파일을 원복합니다."
-        git -C "$repo_dir" restore --worktree --source=HEAD -- "${tracked_restore_paths[@]}"
-    fi
 
     if [ -d "$repo_dir/bootstrap/cache" ]; then
         log "Laravel bootstrap cache 생성 파일을 정리합니다."
         find "$repo_dir/bootstrap/cache" -maxdepth 1 -type f \
-            \( -name 'config.php' -o -name 'events.php' -o -name 'routes-*.php' \) \
+            \( -name 'packages.php' -o -name 'services.php' -o -name 'config.php' -o -name 'events.php' -o -name 'routes-*.php' \) \
             -delete
     fi
 }
