@@ -10,17 +10,15 @@ trap 'trap_err "${LINENO}" "${BASH_COMMAND}" "$?"' ERR
 usage() {
     cat <<'EOF'
 사용법:
-  ./deploy-all.sh <tag-or-sha>
+  ./deploy-all.sh
 
 예시:
-  ./deploy-all.sh v2026.05.21-1
+  ./deploy-all.sh
 EOF
 }
 
 main() {
-    local requested_ref=${1:-}
-
-    [ -n "$requested_ref" ] || {
+    [ $# -eq 0 ] || {
         usage
         exit 1
     }
@@ -30,9 +28,9 @@ main() {
     require_file "$SCRIPT_DIR/deploy-backend.sh"
     require_file "$SCRIPT_DIR/deploy-frontend.sh"
 
-    log "전체 배포 시작: ref=$requested_ref"
-    BLOG_SKIP_DEPLOY_LOCK=1 "$SCRIPT_DIR/deploy-backend.sh" "$requested_ref"
-    BLOG_SKIP_DEPLOY_LOCK=1 "$SCRIPT_DIR/deploy-frontend.sh" "$requested_ref"
+    log "전체 배포 시작: branch=${BLOG_DEPLOY_BRANCH}"
+    BLOG_SKIP_DEPLOY_LOCK=1 "$SCRIPT_DIR/deploy-backend.sh"
+    BLOG_SKIP_DEPLOY_LOCK=1 "$SCRIPT_DIR/deploy-frontend.sh"
     log "전체 배포 완료"
 }
 

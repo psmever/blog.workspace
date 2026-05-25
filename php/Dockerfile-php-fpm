@@ -1,17 +1,43 @@
-FROM php:8.3-fpm-alpine
+ARG PHP_BASE_IMAGE=php:8.5.4-fpm-alpine
+
+FROM ${PHP_BASE_IMAGE}
+
+ARG SWOOLE_VERSION=6.2.1
 
 # 필요한 패키지 설치
 RUN apk add --no-cache \
-    git zip unzip bash icu-dev libzip-dev oniguruma-dev curl-dev libpng-dev \
-    mariadb-connector-c-dev autoconf g++ make mariadb-client
-RUN apk add --no-cache tzdata
+    $PHPIZE_DEPS bash curl git icu-dev libpng-dev libzip-dev linux-headers mariadb-client openssl-dev \
+    tzdata unzip zip
 
 ENV TZ=Asia/Seoul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
  && echo $TZ > /etc/timezone
 
 # PHP 확장 설치
-RUN docker-php-ext-install pdo pdo_mysql mbstring intl zip gd
+RUN docker-php-ext-install bcmath gd intl pcntl pdo_mysql sockets zip \
+    && printf '%s\n' \
+        'yes' \
+        '' \
+        '' \
+        '' \
+        '' \
+        'no' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+    | pecl install swoole-${SWOOLE_VERSION} \
+    && docker-php-ext-enable swoole \
+    && rm -rf /tmp/pear
 
 # PHP 설정 복사
 COPY php.ini /usr/local/etc/php/conf.d/99-custom.ini

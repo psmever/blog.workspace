@@ -3,6 +3,8 @@
 Laravel (Backend) + Next.js (Frontend) + MariaDB
 로컬 개발을 위한 Docker 환경입니다. `.env` 파일은 예시 파일을 기준으로 각 환경에서 직접 작성하고 Git에 커밋하지 않습니다.
 
+현재 workspace 기본 Laravel 런타임 이미지는 `PHP 8.5.4` 와 `Swoole 6.2.1` 기준입니다.
+
 ---
 
 ## 📂 디렉토리 구조
@@ -44,6 +46,14 @@ blog/
 | frontend | `blog.frontend/.env.local.example` | `blog.frontend/.env` |
 
 운영 환경 변수는 서버의 실제 `.env` 또는 별도 Secret Manager에서만 관리합니다. 실제 환경 파일, 운영 키, 비밀번호는 Git, 문서, 동기화 폴더에 두지 않습니다.
+
+Laravel 이미지 관련 기본값:
+
+| 변수 | 기본값 | 설명 |
+|--------|------|------|
+| `PHP_CLI_BASE_IMAGE` | `php:8.5.4-cli-alpine` | 로컬 Octane / 운영 Octane 공통 CLI 베이스 |
+| `PHP_FPM_BASE_IMAGE` | `php:8.5.4-fpm-alpine` | 보조 FPM 이미지 베이스 |
+| `PHP_SWOOLE_VERSION` | `6.2.1` | workspace Laravel 이미지에서 설치하는 Swoole 버전 |
 
 ---
 
@@ -121,20 +131,14 @@ Frontend .env → ../blog.frontend/.env (updated: 2025-10-10)
 
 ## ☁️ AWS EC2 배포
 
-상용 배포는 EC2 직접 배포 기준으로 진행합니다.
+상용 배포 문서는 이 워크스페이스에서 관리하고, 실제 배포 로직은 서버 `/opt/deploy/blog/*.sh` 에 둡니다. 로컬에서는 `make deploy-*` 명령으로 SSH 호출하는 방식을 기본 진입점으로 사용합니다.
 
-1. 서버 접속 직후 timezone을 `Asia/Seoul`로 설정
-2. EC2 보안 그룹에서 `22/tcp`, `80/tcp`, `443/tcp`를 열기
-3. 서버에 `Nginx`, `mariadb`, `PHP 8.3`, `Node 20`, `PM2`, `Certbot` 설치
-4. 서버에 `backend`, `frontend` 저장소 배치
-5. 프로덕션 환경 변수 반영
-6. `systemd`, `PM2`, `Nginx` 설정 적용
-7. HTTPS 발급 후 헬스체크 확인
-
-현재 운영 기준은 `/var/www/jaubi.co.kr/blog/{blog.backend,blog.frontend}` 구조와 `Laravel Octane/systemd + Next.js/PM2(nvm) + Nginx + Certbot` 입니다.
-
-상세 절차는 [docs/aws-ec2.md](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/docs/aws-ec2.md) 를 참고하세요.
-빠른 순서 확인은 [docs/production-deployment-checklist.md](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/docs/production-deployment-checklist.md) 를 참고하세요.
+- 상세 운영 가이드: [docs/aws-ec2.md](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/docs/aws-ec2.md)
+- 빠른 실행 체크리스트: [docs/production-deployment-checklist.md](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/docs/production-deployment-checklist.md)
+- 운영 기준: `backend`, `frontend` 모두 서버 저장소의 `main` 브랜치만 pull 해서 배포하며, 둘 다 반영할 때는 `backend -> frontend` 순서로 진행
+- 기본 명령: `make deploy-sync`, `make deploy-backend`, `make deploy-frontend`, `make deploy-all`, `make deploy-status`
+- PM2 실행 기준 파일: `blog.frontend/ecosystem.config.cjs`
+- `scripts/deploy-prod.sh` 는 `make deploy-*` 가 호출하는 내부 래퍼이며, 필요하면 서버에서 `/opt/deploy/blog/*.sh` 를 직접 실행할 수도 있음
 
 ---
 

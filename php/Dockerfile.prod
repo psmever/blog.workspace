@@ -1,27 +1,59 @@
-FROM php:8.3-cli-alpine
+ARG PHP_BASE_IMAGE=php:8.5.4-cli-alpine
+
+FROM ${PHP_BASE_IMAGE} AS php-runtime
+
+ARG SWOOLE_VERSION=6.2.1
 
 RUN apk add --no-cache \
-    git unzip zip curl icu-dev libzip-dev openssl-dev autoconf g++ make oniguruma-dev brotli-dev \
-    && docker-php-ext-install pdo pdo_mysql mbstring intl zip bcmath pcntl \
-    && pecl install swoole \
+    $PHPIZE_DEPS curl git icu-dev libzip-dev linux-headers openssl-dev \
+    tzdata unzip zip \
+    && docker-php-ext-install bcmath intl pcntl pdo_mysql sockets zip \
+    && printf '%s\n' \
+        'yes' \
+        '' \
+        '' \
+        '' \
+        '' \
+        'no' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+        '' \
+    | pecl install swoole-${SWOOLE_VERSION} \
     && docker-php-ext-enable swoole \
-    && rm -rf /var/cache/apk/* /tmp/*
-
-RUN apk add --no-cache tzdata \
     && ln -snf /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
-    && echo "Asia/Seoul" > /etc/timezone
+    && echo "Asia/Seoul" > /etc/timezone \
+    && rm -rf /tmp/pear /var/cache/apk/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY blog.workspace/php/php.ini /usr/local/etc/php/conf.d/99-custom.ini
 
 WORKDIR /var/www/html
 
+FROM php-runtime AS app
+
+WORKDIR /var/www/html
+
 COPY blog.backend /var/www/html
 
-RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
-    && chmod -R ug+rwx storage bootstrap/cache \
-    && export COMPOSER_ALLOW_SUPERUSER=1 \
-    && composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+RUN set -eu; \
+    mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache; \
+    chmod -R ug+rwx storage bootstrap/cache; \
+    export COMPOSER_ALLOW_SUPERUSER=1; \
+    if ! composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader || ! composer check-platform-reqs; then \
+      echo "❌ PHP 8.5 운영 이미지 빌드 중 composer install/check-platform-reqs 가 실패했습니다."; \
+      echo "   nette/schema 또는 php 8.1 - 8.4 오류면 blog.backend composer.lock 을 PHP 8.5 기준으로 먼저 갱신해야 합니다."; \
+      exit 1; \
+    fi
 
 COPY blog.workspace/php/entrypoint.prod.sh /usr/local/bin/entrypoint.sh
 
