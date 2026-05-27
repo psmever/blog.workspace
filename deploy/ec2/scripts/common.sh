@@ -103,7 +103,7 @@ fetch_origin_branch() {
     local repo_dir=$1
     local branch=${2:-$BLOG_DEPLOY_BRANCH}
 
-    git -C "$repo_dir" fetch --prune origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+    git -C "$repo_dir" fetch --prune origin "+refs/heads/${branch}:refs/remotes/origin/${branch}" >&2
 }
 
 checkout_branch() {
@@ -111,9 +111,9 @@ checkout_branch() {
     local branch=${2:-$BLOG_DEPLOY_BRANCH}
 
     if git -C "$repo_dir" show-ref --verify --quiet "refs/heads/${branch}"; then
-        git -C "$repo_dir" checkout "$branch"
+        git -C "$repo_dir" checkout "$branch" >&2
     else
-        git -C "$repo_dir" checkout -b "$branch" --track "origin/${branch}"
+        git -C "$repo_dir" checkout -b "$branch" --track "origin/${branch}" >&2
     fi
 }
 
@@ -121,7 +121,7 @@ fast_forward_branch() {
     local repo_dir=$1
     local branch=${2:-$BLOG_DEPLOY_BRANCH}
 
-    git -C "$repo_dir" merge --ff-only "origin/${branch}"
+    git -C "$repo_dir" merge --ff-only "origin/${branch}" >&2
 }
 
 ensure_branch_not_ahead() {

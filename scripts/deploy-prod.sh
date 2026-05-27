@@ -132,7 +132,7 @@ create_and_push_deploy_tag() {
 
     echo "deploy tag create component=$component repo=$repo_dir tag=$tag_name commit=$REMOTE_COMMIT_SHA"
 
-    git -C "$repo_dir" fetch "$DEPLOY_TAG_REMOTE" "$DEPLOY_BRANCH" --tags
+    git -C "$repo_dir" fetch --no-tags "$DEPLOY_TAG_REMOTE" "+refs/heads/${DEPLOY_BRANCH}:refs/remotes/${DEPLOY_TAG_REMOTE}/${DEPLOY_BRANCH}"
     git -C "$repo_dir" cat-file -e "${REMOTE_COMMIT_SHA}^{commit}" >/dev/null 2>&1 \
         || die "로컬 저장소에서 원격 배포 커밋을 찾지 못했습니다: ${repo_dir} ${REMOTE_COMMIT_SHA}"
 
