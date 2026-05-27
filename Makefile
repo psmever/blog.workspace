@@ -48,6 +48,7 @@ help:
 	@echo "  make clean              → 모든 컨테이너/볼륨 정리"
 	@echo ""
 	@echo "🧩 개발 유틸리티:"
+	@echo "  make artisan                 → Laravel Artisan 명령 목록 표시"
 	@echo "  make artisan route:list      → Laravel Artisan 임의 명령 실행"
 	@echo "  make artisan CMD=\"route:list\" → 기존 방식도 계속 사용 가능"
 	@echo "  make migrate            → Laravel 마이그레이션 실행"
@@ -197,11 +198,11 @@ reset-project:
 
 artisan:
 	@if [ -z "$(ARTISAN_CMD)" ]; then \
-		echo "❌ 사용법: make artisan route:list"; \
-		echo "   또는: make artisan CMD=\"route:list\""; \
-		exit 1; \
+		echo "📚 Laravel Artisan 명령 목록을 표시합니다..."; \
+		./scripts/artisan.sh list; \
+	else \
+		./scripts/artisan.sh $(ARTISAN_CMD); \
 	fi
-	./scripts/artisan.sh $(ARTISAN_CMD)
 
 migrate:
 	./scripts/artisan.sh migrate
