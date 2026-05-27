@@ -16,7 +16,6 @@
 - 수정 대상:
   - `Makefile`
   - `docker-compose.yml`
-  - `docker-compose.prod.yml`
   - `scripts/`
   - `deploy/`
   - `docs/`

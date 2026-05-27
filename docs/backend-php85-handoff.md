@@ -32,7 +32,6 @@ your php version (8.5.4) does not satisfy that requirement
 
 - 루트 `composer.json` 만 보면 `PHP 8.5` 도 가능해 보입니다.
 - 하지만 현재 `composer.lock` 기준으로는 `PHP 8.5`에서 `composer install` 이 실패합니다.
-- 같은 이유로 `blog.workspace` 의 운영용 Docker 이미지 빌드에서도 [php/Dockerfile.prod](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/php/Dockerfile.prod:1) 의 `composer install` 단계가 실패할 수 있습니다.
 - 따라서 backend 저장소에서 의존성 갱신과 lock 파일 재생성이 먼저 필요합니다.
 
 ## backend 저장소에서 해야 할 일
