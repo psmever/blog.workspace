@@ -362,6 +362,7 @@ CACHE_STORE=database
 QUEUE_CONNECTION=database
 MEDIA_DISK=s3
 POST_IMAGE_MAX_KB=204800
+POST_DEFAULT_COVER_IMAGE_URL=https://cdn.jaubi.co.kr/blog/assets/default-cover.png
 
 CORS_ALLOWED_ORIGINS=https://blog.jaubi.co.kr
 SESSION_DOMAIN=.jaubi.co.kr
@@ -382,6 +383,8 @@ AWS_BUCKET=...
 - `DB_HOST=127.0.0.1` 로 바꾸면 MariaDB에서는 `'blog'@'127.0.0.1'` 접속으로 처리될 수 있어서 권한 오류가 날 수 있습니다.
 - 같은 서버에서 붙는 기본 운영 기준은 `DB_HOST=localhost` 가 안전합니다.
 - 이미지 업로드 제한을 `200M` 으로 맞추려면 `POST_IMAGE_MAX_KB=204800` 을 유지합니다.
+- 기본 커버 이미지는 S3의 `blog/assets/default-cover.png` 에 업로드하고 `POST_DEFAULT_COVER_IMAGE_URL=https://cdn.jaubi.co.kr/blog/assets/default-cover.png` 를 유지합니다.
+- 기본 커버 이미지 URL을 변경한 뒤에는 `php artisan config:cache` 를 다시 실행합니다.
 
 ### 6-1. 이미지 업로드 200M 설정
 
