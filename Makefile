@@ -20,7 +20,7 @@ DEPLOY_SCRIPT = ./scripts/deploy-prod.sh
         sh-laravel sh-nextjs artisan migrate seed yarn \
         logs laravel-log-clear laravel-log-error \
         restart-all \
-        restart-laravel restart-nextjs restart-mariadb \
+        restart-backend restart-frontend restart-db \
         status verify-env help \
         deploy-sync deploy-backend deploy-frontend deploy-all deploy-status
 
@@ -38,9 +38,9 @@ help:
 	@echo ""
 	@echo "🔁 재시작:"
 	@echo "  make restart-all         → 모든 컨테이너 재시작"
-	@echo "  make restart-nextjs      → Next.js 컨테이너 재시작"
-	@echo "  make restart-laravel     → Laravel 컨테이너 재시작"
-	@echo "  make restart-mariadb     → MariaDB 컨테이너 재시작"
+	@echo "  make restart-frontend    → Next.js 컨테이너 재시작"
+	@echo "  make restart-backend     → Laravel 컨테이너 재시작"
+	@echo "  make restart-db          → MariaDB 컨테이너 재시작"
 	@echo ""
 	@echo "🧹 빌드 및 정리:"
 	@echo "  make reset-project      → 모든 컨테이너/볼륨 정리"
@@ -151,17 +151,17 @@ restart-all:
 	$(DC) -f $(COMPOSE_FILE) restart
 	@echo "✅ All containers restarted."
 
-restart-nextjs:
+restart-frontend:
 	@echo "🔄 Restarting Next.js container..."
 	$(DC) -f $(COMPOSE_FILE) restart nextjs
 	@echo "✅ Next.js restarted."
 
-restart-laravel:
+restart-backend:
 	@echo "🔄 Restarting Laravel container..."
 	$(DC) -f $(COMPOSE_FILE) restart laravel
 	@echo "✅ Laravel restarted."
 
-restart-mariadb:
+restart-db:
 	@echo "🔄 Restarting MariaDB container..."
 	$(DC) -f $(COMPOSE_FILE) restart mariadb
 	@echo "✅ MariaDB restarted."
