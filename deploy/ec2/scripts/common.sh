@@ -26,7 +26,7 @@ log() {
 }
 
 die() {
-    log "ERROR: $*"
+    log "ERROR: $*" >&2
     exit 1
 }
 
