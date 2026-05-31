@@ -62,8 +62,8 @@ blog/
 |--------|------|
 | `make migrate` | DB 마이그레이션 실행 |
 | `make seed` | DB 시더 실행 |
-| `make sh-laravel` | Laravel 컨테이너 접속 |
-| `make sh-nextjs` | Next.js 컨테이너 접속 |
+| `make sh-backend` | Backend 컨테이너 접속 |
+| `make sh-frontend` | Frontend 컨테이너 접속 |
 
 ---
 
@@ -71,16 +71,8 @@ blog/
 
 | 명령어 | 설명 |
 |--------|------|
-| `make laravel-log` | Laravel 로그 마지막 50줄 출력 |
-| `make laravel-log tail=100` | 마지막 100줄 출력 |
-| `make laravel-log follow=true` | 실시간 로그 보기 (Ctrl+C 종료) |
-| `make laravel-log-clear` | Laravel 로그 파일 초기화 |
-| `make laravel-log-error` | `ERROR`만 필터링 출력 |
-
-예시:
-```bash
-make laravel-log tail=100 follow=true
-```
+| `make backend-log-clear` | Backend 로그 파일 초기화 |
+| `make backend-log-error` | `ERROR`만 필터링 출력 |
 
 ---
 
@@ -94,9 +86,9 @@ make status
 
 ```
 🟢 Docker Containers:
-  - <project>-laravel-1   running
-  - <project>-nextjs-1    running
-  - <project>-mariadb-1   running
+  - <project>-backend-1    running
+  - <project>-frontend-1   running
+  - <project>-database-1   running
 
 ⚙️ Environment Summary:
 Backend .env → ../blog.backend/.env (updated: 2025-10-10)

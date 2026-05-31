@@ -1,6 +1,6 @@
 services:
   # === Laravel (Octane, 4000 포트) ===
-  laravel:
+  backend:
     build:
       context: ./php
       dockerfile: Dockerfile
@@ -17,13 +17,13 @@ services:
       - ../blog.backend:/var/www/html:cached
       - ${MY_BACKEND_ENV_FILE:-./../blog.backend/.env}:/var/www/html/.env:ro
     depends_on:
-      mariadb:
+      database:
         condition: service_healthy
     networks:
       - blognet
 
   # === Next.js (Dev Server, 3000 포트) ===
-  nextjs:
+  frontend:
     build:
       context: ./node
       dockerfile: Dockerfile
@@ -44,9 +44,9 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ../blog.frontend:/usr/src/app:cached
-      - nextjs_node_modules:/usr/src/app/node_modules
-      - nextjs_next_cache:/usr/src/app/.next
-      - nextjs_yarn_cache:/home/node/.cache/yarn
+      - frontend_node_modules:/usr/src/app/node_modules
+      - frontend_next_cache:/usr/src/app/.next
+      - frontend_yarn_cache:/home/node/.cache/yarn
       - ${MY_FRONTEND_ENV_FILE:-./../blog.frontend/.env}:/usr/src/app/.env:ro
     ports:
       - "3000:3000"
@@ -54,7 +54,7 @@ services:
       - blognet
 
   # === MariaDB ===
-  mariadb:
+  database:
     image: mariadb:11
     environment:
       MARIADB_DATABASE: blog
@@ -86,6 +86,6 @@ networks:
 
 volumes:
   dbdata:
-  nextjs_node_modules:
-  nextjs_next_cache:
-  nextjs_yarn_cache:
+  frontend_node_modules:
+  frontend_next_cache:
+  frontend_yarn_cache:

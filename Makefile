@@ -17,8 +17,8 @@ DEPLOY_SCRIPT = ./scripts/deploy-prod.sh
 .PHONY: check-docker check-env-files check-repos \
         up down \
         build build-images clean reset-project \
-        sh-laravel sh-nextjs artisan migrate seed yarn \
-        logs laravel-log-clear laravel-log-error \
+        sh-backend sh-frontend artisan migrate seed yarn \
+        logs backend-log-clear backend-log-error \
         restart-all \
         restart-backend restart-frontend restart-db \
         status verify-env help \
@@ -54,13 +54,13 @@ help:
 	@echo "  make migrate            → Laravel 마이그레이션 실행"
 	@echo "  make seed               → DB 시드 실행"
 	@echo "  make yarn               → Next.js 패키지 설치"
-	@echo "  make sh-laravel         → Laravel 컨테이너 쉘 접속"
-	@echo "  make sh-nextjs          → Next.js 컨테이너 쉘 접속"
+	@echo "  make sh-backend         → Backend 컨테이너 쉘 접속"
+	@echo "  make sh-frontend        → Frontend 컨테이너 쉘 접속"
 	@echo ""
 	@echo "📜 로그:"
 	@echo "  make logs             → docker-compose 전체 로그 출력 (SERVICE=이름 으로 단일 서비스 지정 가능)"
-	@echo "  make laravel-log-clear  → Octane 로그 초기화"
-	@echo "  make laravel-log-error  → Octane 로그에서 ERROR 검색"
+	@echo "  make backend-log-clear  → Octane 로그 초기화"
+	@echo "  make backend-log-error  → Octane 로그에서 ERROR 검색"
 	@echo ""
 	@echo "🧠 상태:"
 	@echo "  make check-docker     → Docker 런타임 연결 상태 확인"
@@ -153,17 +153,17 @@ restart-all:
 
 restart-frontend:
 	@echo "🔄 Restarting Next.js container..."
-	$(DC) -f $(COMPOSE_FILE) restart nextjs
+	$(DC) -f $(COMPOSE_FILE) restart frontend
 	@echo "✅ Next.js restarted."
 
 restart-backend:
 	@echo "🔄 Restarting Laravel container..."
-	$(DC) -f $(COMPOSE_FILE) restart laravel
+	$(DC) -f $(COMPOSE_FILE) restart backend
 	@echo "✅ Laravel restarted."
 
 restart-db:
 	@echo "🔄 Restarting MariaDB container..."
-	$(DC) -f $(COMPOSE_FILE) restart mariadb
+	$(DC) -f $(COMPOSE_FILE) restart database
 	@echo "✅ MariaDB restarted."
 
 # ===============================
@@ -214,16 +214,16 @@ yarn:
 	./scripts/yarn.sh
 
 # ✅ Laravel attach 모드 (Octane 백그라운드 호환)
-sh-laravel:
-	@if [ -z "$$($(DC) -f $(COMPOSE_FILE) ps -q laravel)" ]; then \
-		echo "⚙️ Laravel container not running — starting..."; \
-		$(DC) -f $(COMPOSE_FILE) up -d laravel; \
+sh-backend:
+	@if [ -z "$$($(DC) -f $(COMPOSE_FILE) ps -q backend)" ]; then \
+		echo "⚙️ Backend container not running — starting..."; \
+		$(DC) -f $(COMPOSE_FILE) up -d backend; \
 	fi
-	@echo "🧩 Attaching to Laravel container shell..."
-	$(DC) -f $(COMPOSE_FILE) exec -it laravel /bin/sh || true
+	@echo "🧩 Attaching to backend container shell..."
+	$(DC) -f $(COMPOSE_FILE) exec -it backend /bin/sh || true
 
-sh-nextjs:
-	$(DC) -f $(COMPOSE_FILE) exec nextjs sh
+sh-frontend:
+	$(DC) -f $(COMPOSE_FILE) exec frontend sh
 
 # ===============================
 # 📜 Laravel Log Commands
@@ -238,12 +238,12 @@ logs:
 		$(DC) -f $(COMPOSE_FILE) logs -f --tail=all; \
 	fi
 
-laravel-log-clear:
-	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "echo '' > /var/log/octane.log"
+backend-log-clear:
+	@$(DC) -f $(COMPOSE_FILE) exec backend sh -c "echo '' > /var/log/octane.log"
 	@echo "✅ Octane log cleared."
 
-laravel-log-error:
-	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "grep -i 'ERROR' /var/log/octane.log || echo 'No errors found ✅'"
+backend-log-error:
+	@$(DC) -f $(COMPOSE_FILE) exec backend sh -c "grep -i 'ERROR' /var/log/octane.log || echo 'No errors found ✅'"
 
 # ===============================
 # 🧠 System Status
@@ -251,8 +251,8 @@ laravel-log-error:
 
 verify-env:
 	@echo "\n🧠 Verifying Environment Variables..."
-	-@$(DC) -f $(COMPOSE_FILE) exec laravel printenv | grep APP_ENV || echo "⚠️ Laravel not running."
-	-@$(DC) -f $(COMPOSE_FILE) exec nextjs printenv | grep NODE_ENV || echo "⚠️ Next.js not running."
+	-@$(DC) -f $(COMPOSE_FILE) exec backend printenv | grep APP_ENV || echo "⚠️ Backend not running."
+	-@$(DC) -f $(COMPOSE_FILE) exec frontend printenv | grep NODE_ENV || echo "⚠️ Frontend not running."
 	@echo "✅ Environment 확인 완료."
 
 status:

@@ -32,8 +32,8 @@
 - 이미지 빌드 + 마이그레이션 + 시드: `make build`
 - 마이그레이션: `make migrate`
 - 시더 실행: `make seed`
-- Laravel 셸 접속: `make sh-laravel`
-- Next.js 셸 접속: `make sh-nextjs`
+- Backend 셸 접속: `make sh-backend`
+- Frontend 셸 접속: `make sh-frontend`
 - Artisan 직접 실행: `./scripts/artisan.sh route:list`
 - Yarn 직접 실행: `./scripts/yarn.sh lint`
 
