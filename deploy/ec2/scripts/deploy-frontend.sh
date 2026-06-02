@@ -11,9 +11,11 @@ usage() {
     cat <<'EOF'
 사용법:
   ./deploy-frontend.sh
+  ./deploy-frontend.sh --skip-git-sync
 
 예시:
   ./deploy-frontend.sh
+  ./deploy-frontend.sh --skip-git-sync
 EOF
 }
 
@@ -29,11 +31,14 @@ restart_frontend() {
 
 main() {
     local resolved_commit
+    local skip_git_sync=0
 
-    [ $# -eq 0 ] || {
+    if [ $# -eq 1 ] && [ "$1" = "--skip-git-sync" ]; then
+        skip_git_sync=1
+    elif [ $# -ne 0 ]; then
         usage
         exit 1
-    }
+    fi
 
     init_logging "deploy-frontend"
     acquire_deploy_lock
@@ -43,19 +48,29 @@ main() {
     require_file "$BLOG_FRONTEND_DIR/.env"
     require_file "$BLOG_FRONTEND_DIR/ecosystem.config.cjs"
 
-    log "frontend 배포 시작: branch=${BLOG_DEPLOY_BRANCH}"
+    log "[frontend 1/7] 배포 시작: branch=${BLOG_DEPLOY_BRANCH} skip_git_sync=${skip_git_sync}"
 
+    log "[frontend 2/7] 서버 작업 트리를 확인합니다."
     ensure_git_worktree_clean "$BLOG_FRONTEND_DIR"
-    resolved_commit=$(sync_repo_to_branch "$BLOG_FRONTEND_DIR" "$BLOG_DEPLOY_BRANCH")
+    if [ "$skip_git_sync" = "1" ]; then
+        log "[Git 1/1] --skip-git-sync 요청: 서버 저장소 fetch, checkout, pull 을 생략합니다."
+        resolved_commit=$(git -C "$BLOG_FRONTEND_DIR" rev-parse HEAD)
+    else
+        log "[Git 1/1] origin/${BLOG_DEPLOY_BRANCH} 을 서버 저장소에 동기화합니다."
+        resolved_commit=$(sync_repo_to_branch "$BLOG_FRONTEND_DIR" "$BLOG_DEPLOY_BRANCH")
+    fi
 
-    log "배포 커밋: $resolved_commit"
+    log "[frontend 3/7] 배포 커밋 확인: $resolved_commit"
 
     cd "$BLOG_FRONTEND_DIR"
 
+    log "[frontend 4/7] Yarn 의존성 설치와 프로덕션 빌드를 실행합니다."
     run_yarn install --immutable
     run_yarn build
+    log "[frontend 5/7] blog-frontend PM2 프로세스를 재시작합니다."
     restart_frontend
 
+    log "[frontend 6/7] frontend direct, nginx 헬스체크를 실행합니다."
     wait_for_http "frontend direct" "$BLOG_FRONTEND_HEALTH_URL"
     wait_for_http \
         "frontend nginx" \
@@ -63,7 +78,7 @@ main() {
         -H "Host: ${BLOG_PUBLIC_FRONTEND_HOST}"
 
     record_deploy_state "frontend" "$BLOG_DEPLOY_BRANCH" "$resolved_commit"
-    log "frontend 배포 완료"
+    log "[frontend 7/7] frontend 배포 완료"
 }
 
 main "$@"

@@ -6,9 +6,10 @@ ARG SWOOLE_VERSION=6.2.1
 
 # 필수 패키지 및 확장 설치
 RUN apk add --no-cache \
-    $PHPIZE_DEPS curl git icu-dev libzip-dev linux-headers openssl-dev \
+    $PHPIZE_DEPS curl git icu-dev libjpeg-turbo-dev libpng-dev libwebp-dev libzip-dev linux-headers openssl-dev \
     tzdata unzip zip \
-    && docker-php-ext-install bcmath intl pcntl pdo_mysql sockets zip \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
+    && docker-php-ext-install bcmath exif gd intl pcntl pdo_mysql sockets zip \
     && printf '%s\n' \
         'yes' \
         '' \

@@ -16,7 +16,7 @@ DEPLOY_SCRIPT = ./scripts/deploy-prod.sh
 
 .PHONY: check-docker check-env-files check-repos \
         up down \
-        build build-images clean reset-project \
+        build build-images clean \
         sh-backend sh-frontend artisan migrate seed yarn \
         logs backend-log-clear backend-log-error \
         restart-all \
@@ -43,7 +43,6 @@ help:
 	@echo "  make restart-db          → MariaDB 컨테이너 재시작"
 	@echo ""
 	@echo "🧹 빌드 및 정리:"
-	@echo "  make reset-project      → 모든 컨테이너/볼륨 정리"
 	@echo "  make build              → 로컬 이미지 재빌드 후 migrate/seed 실행"
 	@echo "  make clean              → 모든 컨테이너/볼륨 정리"
 	@echo ""
@@ -71,9 +70,9 @@ help:
 	@echo ""
 	@echo "☁️ 상용 배포:"
 	@echo "  make deploy-sync       → 서버 /opt/deploy/blog 배포 스크립트 동기화"
-	@echo "  make deploy-backend    → 서버 blog.backend main 브랜치 pull 배포 후 backend Git tag push"
-	@echo "  make deploy-frontend   → 서버 blog.frontend main 브랜치 pull 배포 후 frontend Git tag push"
-	@echo "  make deploy-all        → backend -> frontend 순서로 main 브랜치 배포 후 각 앱 Git tag push"
+	@echo "  make deploy-backend    → backend 신규 develop 커밋 승격 또는 Git 생략 재배포"
+	@echo "  make deploy-frontend   → frontend 신규 develop 커밋 승격 또는 Git 생략 재배포"
+	@echo "  make deploy-all        → backend -> frontend 순서로 신규 커밋 승격 또는 Git 생략 재배포"
 	@echo "  make deploy-status     → 서버 마지막 배포 상태/헬스체크 확인"
 	@echo ""
 	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
@@ -186,11 +185,6 @@ clean:
 	@echo "🧹 Cleaning environment..."
 	$(DC) -f $(COMPOSE_FILE) down -v || true
 	@echo "✅ Clean complete."
-
-reset-project:
-	@echo "♻️ Resetting this project..."
-	@$(MAKE) clean
-	@echo "✅ Project reset complete."
 
 # ===============================
 # 🧩 Laravel / Next.js Utilities

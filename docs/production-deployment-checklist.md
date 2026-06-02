@@ -22,11 +22,16 @@
 
 - 실제 배포 로직은 서버 `/opt/deploy/blog/*.sh` 에 둡니다.
 - 로컬 `make deploy-*` 를 SSH 진입점으로 사용합니다.
-- `backend`, `frontend` 모두 서버 저장소의 `origin/main` 만 pull 해서 배포합니다.
+- `backend`, `frontend` 모두 로컬에서 `origin/develop` 을 `main` 에 `--no-ff` 로 병합하고 `origin/main` 으로 push한 뒤, 서버 저장소의 `origin/main` 을 pull 해서 배포합니다.
+- 로컬 병합 충돌 또는 push 실패 시 로컬 `main` 을 병합 전 커밋으로 원복하고 배포를 중단합니다.
+- `origin/develop` 에 `main` 미반영 커밋이 없으면 로컬 병합, 서버 Git 동기화, 배포 태그 생성을 생략하고 서버 재배포만 수행합니다.
+- 배포 스크립트는 성공 또는 실패로 종료되기 직전에 처리한 로컬 저장소를 `develop` 브랜치로 checkout 합니다.
+- 실행 중에는 전체 순서도와 단계별 분기 사유를 화면에 출력합니다.
 - 둘 다 반영할 때는 `backend -> frontend` 순서로 배포합니다.
 - PM2 실행 기준 파일은 `blog.frontend/ecosystem.config.cjs` 입니다.
 - 워크스페이스의 [deploy/ec2/pm2/ecosystem.config.cjs](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/deploy/ec2/pm2/ecosystem.config.cjs:1) 는 참고용 템플릿입니다.
-- `deploy-backend.sh`, `deploy-frontend.sh`, `deploy-all.sh` 는 인자를 받지 않고 각 저장소의 `main` 브랜치를 반영합니다.
+- `deploy-backend.sh`, `deploy-frontend.sh` 는 기본적으로 각 저장소의 `main` 브랜치를 반영하며, `--skip-git-sync` 재배포 모드에서는 서버 Git 동기화를 생략합니다.
+- `deploy-all.sh` 는 인자를 받지 않고 backend, frontend 순서로 각 저장소의 `main` 브랜치를 반영합니다.
 
 ## 준비 자료
 
