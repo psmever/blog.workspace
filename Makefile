@@ -12,6 +12,7 @@ FRONTEND_DIR = ../blog.frontend
 ARTISAN_GOALS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
 DEPLOY_SCRIPT = ./scripts/deploy-prod.sh
+DB_TUNNEL_SCRIPT = ./scripts/db-tunnel-prod.sh
 .DEFAULT_GOAL := help
 
 .PHONY: check-docker check-env-files check-repos \
@@ -22,7 +23,8 @@ DEPLOY_SCRIPT = ./scripts/deploy-prod.sh
         restart-all \
         restart-backend restart-frontend restart-db \
         status verify-env help \
-        deploy-sync deploy-backend deploy-frontend deploy-all deploy-status
+        deploy-sync deploy-backend deploy-frontend deploy-all deploy-status \
+        db-tunnel-start db-tunnel-stop db-tunnel-status db-tunnel-restart db-tunnel-foreground
 
 ifeq ($(firstword $(MAKECMDGOALS)),artisan)
 %:
@@ -74,6 +76,13 @@ help:
 	@echo "  make deploy-frontend   → frontend 신규 develop 커밋 승격 또는 Git 생략 재배포"
 	@echo "  make deploy-all        → backend -> frontend 순서로 신규 커밋 승격 또는 Git 생략 재배포"
 	@echo "  make deploy-status     → 서버 마지막 배포 상태/헬스체크 확인"
+	@echo ""
+	@echo "🔐 상용 DB SSH 터널:"
+	@echo "  make db-tunnel-start       → 상용 DB SSH 터널 백그라운드 연결"
+	@echo "  make db-tunnel-stop        → 상용 DB SSH 터널 종료"
+	@echo "  make db-tunnel-status      → 상용 DB SSH 터널 상태 확인"
+	@echo "  make db-tunnel-restart     → 상용 DB SSH 터널 재시작"
+	@echo "  make db-tunnel-foreground  → 상용 DB SSH 터널 포그라운드 연결"
 	@echo ""
 	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
 
@@ -280,3 +289,22 @@ deploy-all:
 
 deploy-status:
 	$(DEPLOY_SCRIPT) status
+
+# ===============================
+# 🔐 Production DB SSH Tunnel
+# ===============================
+
+db-tunnel-start:
+	$(DB_TUNNEL_SCRIPT) start
+
+db-tunnel-stop:
+	$(DB_TUNNEL_SCRIPT) stop
+
+db-tunnel-status:
+	$(DB_TUNNEL_SCRIPT) status
+
+db-tunnel-restart:
+	$(DB_TUNNEL_SCRIPT) start --restart
+
+db-tunnel-foreground:
+	$(DB_TUNNEL_SCRIPT) start --foreground
