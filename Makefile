@@ -12,17 +12,19 @@ FRONTEND_DIR = ../blog.frontend
 ARTISAN_GOALS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 ARTISAN_CMD := $(strip $(if $(CMD),$(CMD),$(ARTISAN_GOALS)))
 DEPLOY_SCRIPT = ./scripts/deploy-prod.sh
+DB_TUNNEL_SCRIPT = ./scripts/db-tunnel-prod.sh
 .DEFAULT_GOAL := help
 
 .PHONY: check-docker check-env-files check-repos \
         up down \
-        build build-images clean reset-project \
-        sh-laravel sh-nextjs artisan migrate seed yarn \
-        logs laravel-log-clear laravel-log-error \
+        build build-images clean \
+        sh-backend sh-frontend artisan migrate seed yarn \
+        logs backend-log-clear backend-log-error \
         restart-all \
-        restart-laravel restart-nextjs restart-mariadb \
+        restart-backend restart-frontend restart-db \
         status verify-env help \
-        deploy-sync deploy-backend deploy-frontend deploy-all deploy-status
+        deploy-sync deploy-backend deploy-frontend deploy-all deploy-status \
+        db-tunnel-start db-tunnel-stop db-tunnel-status db-tunnel-restart db-tunnel-foreground
 
 ifeq ($(firstword $(MAKECMDGOALS)),artisan)
 %:
@@ -38,28 +40,28 @@ help:
 	@echo ""
 	@echo "🔁 재시작:"
 	@echo "  make restart-all         → 모든 컨테이너 재시작"
-	@echo "  make restart-nextjs      → Next.js 컨테이너 재시작"
-	@echo "  make restart-laravel     → Laravel 컨테이너 재시작"
-	@echo "  make restart-mariadb     → MariaDB 컨테이너 재시작"
+	@echo "  make restart-frontend    → Next.js 컨테이너 재시작"
+	@echo "  make restart-backend     → Laravel 컨테이너 재시작"
+	@echo "  make restart-db          → MariaDB 컨테이너 재시작"
 	@echo ""
 	@echo "🧹 빌드 및 정리:"
-	@echo "  make reset-project      → 모든 컨테이너/볼륨 정리"
 	@echo "  make build              → 로컬 이미지 재빌드 후 migrate/seed 실행"
 	@echo "  make clean              → 모든 컨테이너/볼륨 정리"
 	@echo ""
 	@echo "🧩 개발 유틸리티:"
+	@echo "  make artisan                 → Laravel Artisan 명령 목록 표시"
 	@echo "  make artisan route:list      → Laravel Artisan 임의 명령 실행"
 	@echo "  make artisan CMD=\"route:list\" → 기존 방식도 계속 사용 가능"
 	@echo "  make migrate            → Laravel 마이그레이션 실행"
 	@echo "  make seed               → DB 시드 실행"
 	@echo "  make yarn               → Next.js 패키지 설치"
-	@echo "  make sh-laravel         → Laravel 컨테이너 쉘 접속"
-	@echo "  make sh-nextjs          → Next.js 컨테이너 쉘 접속"
+	@echo "  make sh-backend         → Backend 컨테이너 쉘 접속"
+	@echo "  make sh-frontend        → Frontend 컨테이너 쉘 접속"
 	@echo ""
 	@echo "📜 로그:"
 	@echo "  make logs             → docker-compose 전체 로그 출력 (SERVICE=이름 으로 단일 서비스 지정 가능)"
-	@echo "  make laravel-log-clear  → Octane 로그 초기화"
-	@echo "  make laravel-log-error  → Octane 로그에서 ERROR 검색"
+	@echo "  make backend-log-clear  → Octane 로그 초기화"
+	@echo "  make backend-log-error  → Octane 로그에서 ERROR 검색"
 	@echo ""
 	@echo "🧠 상태:"
 	@echo "  make check-docker     → Docker 런타임 연결 상태 확인"
@@ -70,10 +72,17 @@ help:
 	@echo ""
 	@echo "☁️ 상용 배포:"
 	@echo "  make deploy-sync       → 서버 /opt/deploy/blog 배포 스크립트 동기화"
-	@echo "  make deploy-backend    → 서버 blog.backend main 브랜치 pull 배포 후 backend Git tag push"
-	@echo "  make deploy-frontend   → 서버 blog.frontend main 브랜치 pull 배포 후 frontend Git tag push"
-	@echo "  make deploy-all        → backend -> frontend 순서로 main 브랜치 배포 후 각 앱 Git tag push"
+	@echo "  make deploy-backend    → backend 신규 develop 커밋 승격 또는 Git 생략 재배포"
+	@echo "  make deploy-frontend   → frontend 신규 develop 커밋 승격 또는 Git 생략 재배포"
+	@echo "  make deploy-all        → backend -> frontend 순서로 신규 커밋 승격 또는 Git 생략 재배포"
 	@echo "  make deploy-status     → 서버 마지막 배포 상태/헬스체크 확인"
+	@echo ""
+	@echo "🔐 상용 DB SSH 터널:"
+	@echo "  make db-tunnel-start       → 상용 DB SSH 터널 백그라운드 연결"
+	@echo "  make db-tunnel-stop        → 상용 DB SSH 터널 종료"
+	@echo "  make db-tunnel-status      → 상용 DB SSH 터널 상태 확인"
+	@echo "  make db-tunnel-restart     → 상용 DB SSH 터널 재시작"
+	@echo "  make db-tunnel-foreground  → 상용 DB SSH 터널 포그라운드 연결"
 	@echo ""
 	@echo "👉 원하는 명령어를 make 뒤에 입력하세요. (예: make up)"
 
@@ -150,19 +159,19 @@ restart-all:
 	$(DC) -f $(COMPOSE_FILE) restart
 	@echo "✅ All containers restarted."
 
-restart-nextjs:
+restart-frontend:
 	@echo "🔄 Restarting Next.js container..."
-	$(DC) -f $(COMPOSE_FILE) restart nextjs
+	$(DC) -f $(COMPOSE_FILE) restart frontend
 	@echo "✅ Next.js restarted."
 
-restart-laravel:
+restart-backend:
 	@echo "🔄 Restarting Laravel container..."
-	$(DC) -f $(COMPOSE_FILE) restart laravel
+	$(DC) -f $(COMPOSE_FILE) restart backend
 	@echo "✅ Laravel restarted."
 
-restart-mariadb:
+restart-db:
 	@echo "🔄 Restarting MariaDB container..."
-	$(DC) -f $(COMPOSE_FILE) restart mariadb
+	$(DC) -f $(COMPOSE_FILE) restart database
 	@echo "✅ MariaDB restarted."
 
 # ===============================
@@ -186,22 +195,17 @@ clean:
 	$(DC) -f $(COMPOSE_FILE) down -v || true
 	@echo "✅ Clean complete."
 
-reset-project:
-	@echo "♻️ Resetting this project..."
-	@$(MAKE) clean
-	@echo "✅ Project reset complete."
-
 # ===============================
 # 🧩 Laravel / Next.js Utilities
 # ===============================
 
 artisan:
 	@if [ -z "$(ARTISAN_CMD)" ]; then \
-		echo "❌ 사용법: make artisan route:list"; \
-		echo "   또는: make artisan CMD=\"route:list\""; \
-		exit 1; \
+		echo "📚 Laravel Artisan 명령 목록을 표시합니다..."; \
+		./scripts/artisan.sh list; \
+	else \
+		./scripts/artisan.sh $(ARTISAN_CMD); \
 	fi
-	./scripts/artisan.sh $(ARTISAN_CMD)
 
 migrate:
 	./scripts/artisan.sh migrate
@@ -213,16 +217,16 @@ yarn:
 	./scripts/yarn.sh
 
 # ✅ Laravel attach 모드 (Octane 백그라운드 호환)
-sh-laravel:
-	@if [ -z "$$($(DC) -f $(COMPOSE_FILE) ps -q laravel)" ]; then \
-		echo "⚙️ Laravel container not running — starting..."; \
-		$(DC) -f $(COMPOSE_FILE) up -d laravel; \
+sh-backend:
+	@if [ -z "$$($(DC) -f $(COMPOSE_FILE) ps -q backend)" ]; then \
+		echo "⚙️ Backend container not running — starting..."; \
+		$(DC) -f $(COMPOSE_FILE) up -d backend; \
 	fi
-	@echo "🧩 Attaching to Laravel container shell..."
-	$(DC) -f $(COMPOSE_FILE) exec -it laravel /bin/sh || true
+	@echo "🧩 Attaching to backend container shell..."
+	$(DC) -f $(COMPOSE_FILE) exec -it backend /bin/sh || true
 
-sh-nextjs:
-	$(DC) -f $(COMPOSE_FILE) exec nextjs sh
+sh-frontend:
+	$(DC) -f $(COMPOSE_FILE) exec frontend sh
 
 # ===============================
 # 📜 Laravel Log Commands
@@ -237,12 +241,12 @@ logs:
 		$(DC) -f $(COMPOSE_FILE) logs -f --tail=all; \
 	fi
 
-laravel-log-clear:
-	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "echo '' > /var/log/octane.log"
+backend-log-clear:
+	@$(DC) -f $(COMPOSE_FILE) exec backend sh -c "echo '' > /var/log/octane.log"
 	@echo "✅ Octane log cleared."
 
-laravel-log-error:
-	@$(DC) -f $(COMPOSE_FILE) exec laravel sh -c "grep -i 'ERROR' /var/log/octane.log || echo 'No errors found ✅'"
+backend-log-error:
+	@$(DC) -f $(COMPOSE_FILE) exec backend sh -c "grep -i 'ERROR' /var/log/octane.log || echo 'No errors found ✅'"
 
 # ===============================
 # 🧠 System Status
@@ -250,8 +254,8 @@ laravel-log-error:
 
 verify-env:
 	@echo "\n🧠 Verifying Environment Variables..."
-	-@$(DC) -f $(COMPOSE_FILE) exec laravel printenv | grep APP_ENV || echo "⚠️ Laravel not running."
-	-@$(DC) -f $(COMPOSE_FILE) exec nextjs printenv | grep NODE_ENV || echo "⚠️ Next.js not running."
+	-@$(DC) -f $(COMPOSE_FILE) exec backend printenv | grep APP_ENV || echo "⚠️ Backend not running."
+	-@$(DC) -f $(COMPOSE_FILE) exec frontend printenv | grep NODE_ENV || echo "⚠️ Frontend not running."
 	@echo "✅ Environment 확인 완료."
 
 status:
@@ -285,3 +289,22 @@ deploy-all:
 
 deploy-status:
 	$(DEPLOY_SCRIPT) status
+
+# ===============================
+# 🔐 Production DB SSH Tunnel
+# ===============================
+
+db-tunnel-start:
+	$(DB_TUNNEL_SCRIPT) start
+
+db-tunnel-stop:
+	$(DB_TUNNEL_SCRIPT) stop
+
+db-tunnel-status:
+	$(DB_TUNNEL_SCRIPT) status
+
+db-tunnel-restart:
+	$(DB_TUNNEL_SCRIPT) start --restart
+
+db-tunnel-foreground:
+	$(DB_TUNNEL_SCRIPT) start --foreground

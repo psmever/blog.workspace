@@ -3,7 +3,7 @@
 Laravel (Backend) + Next.js (Frontend) + MariaDB
 로컬 개발을 위한 Docker 환경입니다. `.env` 파일은 예시 파일을 기준으로 각 환경에서 직접 작성하고 Git에 커밋하지 않습니다.
 
-현재 workspace 기본 Laravel 런타임 이미지는 `PHP 8.5.4` 와 `Swoole 6.2.1` 기준입니다.
+현재 workspace 로컬 Laravel 런타임 이미지는 `PHP 8.5.4` 와 `Swoole 6.2.1` 기준입니다.
 
 ---
 
@@ -47,12 +47,11 @@ blog/
 
 운영 환경 변수는 서버의 실제 `.env` 또는 별도 Secret Manager에서만 관리합니다. 실제 환경 파일, 운영 키, 비밀번호는 Git, 문서, 동기화 폴더에 두지 않습니다.
 
-Laravel 이미지 관련 기본값:
+로컬 Laravel 이미지 관련 기본값:
 
 | 변수 | 기본값 | 설명 |
 |--------|------|------|
-| `PHP_CLI_BASE_IMAGE` | `php:8.5.4-cli-alpine` | 로컬 Octane / 운영 Octane 공통 CLI 베이스 |
-| `PHP_FPM_BASE_IMAGE` | `php:8.5.4-fpm-alpine` | 보조 FPM 이미지 베이스 |
+| `PHP_CLI_BASE_IMAGE` | `php:8.5.4-cli-alpine` | 로컬 Octane CLI 베이스 |
 | `PHP_SWOOLE_VERSION` | `6.2.1` | workspace Laravel 이미지에서 설치하는 Swoole 버전 |
 
 ---
@@ -63,8 +62,8 @@ Laravel 이미지 관련 기본값:
 |--------|------|
 | `make migrate` | DB 마이그레이션 실행 |
 | `make seed` | DB 시더 실행 |
-| `make sh-laravel` | Laravel 컨테이너 접속 |
-| `make sh-nextjs` | Next.js 컨테이너 접속 |
+| `make sh-backend` | Backend 컨테이너 접속 |
+| `make sh-frontend` | Frontend 컨테이너 접속 |
 
 ---
 
@@ -72,16 +71,8 @@ Laravel 이미지 관련 기본값:
 
 | 명령어 | 설명 |
 |--------|------|
-| `make laravel-log` | Laravel 로그 마지막 50줄 출력 |
-| `make laravel-log tail=100` | 마지막 100줄 출력 |
-| `make laravel-log follow=true` | 실시간 로그 보기 (Ctrl+C 종료) |
-| `make laravel-log-clear` | Laravel 로그 파일 초기화 |
-| `make laravel-log-error` | `ERROR`만 필터링 출력 |
-
-예시:
-```bash
-make laravel-log tail=100 follow=true
-```
+| `make backend-log-clear` | Backend 로그 파일 초기화 |
+| `make backend-log-error` | `ERROR`만 필터링 출력 |
 
 ---
 
@@ -95,9 +86,9 @@ make status
 
 ```
 🟢 Docker Containers:
-  - <project>-laravel-1   running
-  - <project>-nextjs-1    running
-  - <project>-mariadb-1   running
+  - <project>-backend-1    running
+  - <project>-frontend-1   running
+  - <project>-database-1   running
 
 ⚙️ Environment Summary:
 Backend .env → ../blog.backend/.env (updated: 2025-10-10)

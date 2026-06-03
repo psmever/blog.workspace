@@ -41,9 +41,14 @@
 - 실제 배포 로직은 서버 `/opt/deploy/blog/*.sh` 에 둡니다.
 - 표준 실행 경로는 로컬 `make deploy-*` 가 SSH로 서버 배포 스크립트를 호출하는 방식입니다.
 - 필요하면 서버에 접속해서 `/opt/deploy/blog/*.sh` 를 직접 실행할 수도 있습니다.
-- `backend`와 `frontend`는 서로 독립된 배포 단위이지만, 현재 운영 배포는 두 저장소 모두 `origin/main` 만 pull 하는 방식입니다.
+- `backend`와 `frontend`는 서로 독립된 배포 단위이며, 로컬에서 `origin/develop` 을 `main` 에 `--no-ff` 로 병합하고 `origin/main` 으로 push한 뒤 서버가 `origin/main` 을 pull 해서 배포합니다.
+- 로컬 병합 충돌 또는 push 실패 시 로컬 `main` 을 병합 전 커밋으로 원복하고 배포를 중단합니다.
+- `origin/develop` 에 `main` 미반영 커밋이 없으면 로컬 병합, 서버 Git 동기화, 배포 태그 생성을 생략하고 서버 재배포만 수행합니다.
+- 배포 스크립트는 성공 또는 실패로 종료되기 직전에 처리한 로컬 저장소를 `develop` 브랜치로 checkout 합니다.
+- 실행 중에는 전체 순서도와 단계별 분기 사유를 화면에 출력합니다.
 - 전체 반영이 필요할 때의 기본 순서는 `backend -> frontend` 입니다.
-- `deploy-backend.sh`, `deploy-frontend.sh`, `deploy-all.sh` 는 인자를 받지 않고 각 저장소의 `main` 브랜치를 반영합니다.
+- `deploy-backend.sh`, `deploy-frontend.sh` 는 기본적으로 각 저장소의 `main` 브랜치를 반영하며, `--skip-git-sync` 재배포 모드에서는 서버 Git 동기화를 생략합니다.
+- `deploy-all.sh` 는 인자를 받지 않고 backend, frontend 순서로 각 저장소의 `main` 브랜치를 반영합니다.
 - 배포 스크립트가 바뀌면 먼저 `make deploy-sync` 로 서버 `/opt/deploy/blog` 를 갱신합니다.
 - `make deploy-backend`, `make deploy-frontend`, `make deploy-all` 이 성공하면 로컬 래퍼가 앱 저장소 `origin` 에 `deploy/prod/<app>/<timestamp>` annotated tag를 자동 push 합니다.
 - PM2 실행 기준 파일은 서버의 `blog.frontend/ecosystem.config.cjs` 입니다.
@@ -362,6 +367,7 @@ CACHE_STORE=database
 QUEUE_CONNECTION=database
 MEDIA_DISK=s3
 POST_IMAGE_MAX_KB=204800
+POST_DEFAULT_COVER_IMAGE_URL=https://cdn.jaubi.co.kr/blog/assets/default-cover.png
 
 CORS_ALLOWED_ORIGINS=https://blog.jaubi.co.kr
 SESSION_DOMAIN=.jaubi.co.kr
@@ -382,6 +388,8 @@ AWS_BUCKET=...
 - `DB_HOST=127.0.0.1` 로 바꾸면 MariaDB에서는 `'blog'@'127.0.0.1'` 접속으로 처리될 수 있어서 권한 오류가 날 수 있습니다.
 - 같은 서버에서 붙는 기본 운영 기준은 `DB_HOST=localhost` 가 안전합니다.
 - 이미지 업로드 제한을 `200M` 으로 맞추려면 `POST_IMAGE_MAX_KB=204800` 을 유지합니다.
+- 기본 커버 이미지는 S3의 `blog/assets/default-cover.png` 에 업로드하고 `POST_DEFAULT_COVER_IMAGE_URL=https://cdn.jaubi.co.kr/blog/assets/default-cover.png` 를 유지합니다.
+- 기본 커버 이미지 URL을 변경한 뒤에는 `php artisan config:cache` 를 다시 실행합니다.
 
 ### 6-1. 이미지 업로드 200M 설정
 
@@ -687,7 +695,10 @@ sudo tail -f /var/log/nginx/access.log /var/log/nginx/error.log
 
 기본 원칙:
 
-- 배포 기준은 두 저장소 모두 `origin/main` 입니다.
+- 배포 전 로컬에서 `origin/develop` 을 `main` 에 `--no-ff` 로 병합하고 `origin/main` 으로 push합니다.
+- 서버 배포 기준은 두 저장소 모두 `origin/main` 입니다.
+- `origin/develop` 에 신규 커밋이 없으면 서버 Git 동기화와 배포 태그 생성을 생략하고 서버 재배포만 수행합니다.
+- 성공 또는 실패 종료 직전에 처리한 로컬 저장소를 `develop` 브랜치로 checkout 합니다.
 - 둘 다 재배포할 때는 `backend -> frontend` 순서로 진행합니다.
 
 권장 순서:

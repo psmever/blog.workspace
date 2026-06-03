@@ -13,7 +13,7 @@ else
 fi
 
 # 컨테이너 내부에서 /tmp 에 라라벨 생성 → /var/www/html 로 복사 ('.git*' 보존)
-"${DC_CMD[@]}" -f "$PROJ_ROOT/docker-compose.yml" run --rm --entrypoint /bin/sh laravel -c '
+"${DC_CMD[@]}" -f "$PROJ_ROOT/docker-compose.yml" run --rm --entrypoint /bin/sh backend -c '
   set -eu
 
   APP_DIR="/var/www/html"
