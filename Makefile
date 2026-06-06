@@ -19,6 +19,7 @@ DB_TUNNEL_SCRIPT = ./scripts/db-tunnel-prod.sh
         up down \
         build build-images clean \
         sh-backend sh-frontend artisan migrate seed yarn \
+        source-update \
         logs backend-log-clear backend-log-error \
         restart-all \
         restart-backend restart-frontend restart-db \
@@ -57,6 +58,7 @@ help:
 	@echo "  make yarn               → Next.js 패키지 설치"
 	@echo "  make sh-backend         → Backend 컨테이너 쉘 접속"
 	@echo "  make sh-frontend        → Frontend 컨테이너 쉘 접속"
+	@echo "  make source-update      → backend/frontend develop, main 최신화 후 develop으로 복귀"
 	@echo ""
 	@echo "📜 로그:"
 	@echo "  make logs             → docker-compose 전체 로그 출력 (SERVICE=이름 으로 단일 서비스 지정 가능)"
@@ -215,6 +217,32 @@ seed:
 
 yarn:
 	./scripts/yarn.sh
+
+source-update:
+	@set -eu; \
+	for repo in "$(BACKEND_DIR)" "$(FRONTEND_DIR)"; do \
+		if [ ! -d "$$repo/.git" ]; then \
+			echo "❌ Git 저장소가 없습니다: $$repo"; \
+			exit 1; \
+		fi; \
+		if ! git -C "$$repo" diff --quiet || ! git -C "$$repo" diff --cached --quiet; then \
+			echo "❌ 변경사항이 남아 있어 중단합니다: $$repo"; \
+			git -C "$$repo" status --short; \
+			exit 1; \
+		fi; \
+	done; \
+	for repo in "$(BACKEND_DIR)" "$(FRONTEND_DIR)"; do \
+		name=$$(basename "$$repo"); \
+		echo "🔄 $$name: develop 최신화"; \
+		git -C "$$repo" checkout develop; \
+		git -C "$$repo" pull --ff-only origin develop; \
+		echo "🔄 $$name: main 최신화"; \
+		git -C "$$repo" checkout main; \
+		git -C "$$repo" pull --ff-only origin main; \
+		echo "↩️ $$name: develop으로 복귀"; \
+		git -C "$$repo" checkout develop; \
+	done; \
+	echo "✅ backend/frontend source-update 완료."
 
 # ✅ Laravel attach 모드 (Octane 백그라운드 호환)
 sh-backend:
