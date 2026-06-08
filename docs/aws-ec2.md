@@ -492,6 +492,7 @@ php artisan route:cache
 cd /var/www/jaubi.co.kr/blog/blog.frontend
 
 yarn install --immutable
+rm -rf .next
 yarn build
 ```
 

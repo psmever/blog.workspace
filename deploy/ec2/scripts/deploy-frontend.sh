@@ -64,13 +64,16 @@ main() {
 
     cd "$BLOG_FRONTEND_DIR"
 
-    log "[frontend 4/7] Yarn 의존성 설치와 프로덕션 빌드를 실행합니다."
+    log "[frontend 4/8] 기존 Next.js 빌드 산출물을 정리합니다."
+    rm -rf .next
+
+    log "[frontend 5/8] Yarn 의존성 설치와 프로덕션 빌드를 실행합니다."
     run_yarn install --immutable
     run_yarn build
-    log "[frontend 5/7] blog-frontend PM2 프로세스를 재시작합니다."
+    log "[frontend 6/8] blog-frontend PM2 프로세스를 재시작합니다."
     restart_frontend
 
-    log "[frontend 6/7] frontend direct, nginx 헬스체크를 실행합니다."
+    log "[frontend 7/8] frontend direct, nginx 헬스체크를 실행합니다."
     wait_for_http "frontend direct" "$BLOG_FRONTEND_HEALTH_URL"
     wait_for_http \
         "frontend nginx" \
@@ -78,7 +81,7 @@ main() {
         -H "Host: ${BLOG_PUBLIC_FRONTEND_HOST}"
 
     record_deploy_state "frontend" "$BLOG_DEPLOY_BRANCH" "$resolved_commit"
-    log "[frontend 7/7] frontend 배포 완료"
+    log "[frontend 8/8] frontend 배포 완료"
 }
 
 main "$@"
