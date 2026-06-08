@@ -29,7 +29,8 @@ blog/
 | `make up` | 로컬 컨테이너 실행 (Octane :4000) |
 | `make down` | 로컬 컨테이너 중지 및 정리 |
 | `make restart-all` | 모든 컨테이너 재시작 |
-| `make build` | 이미지 캐시 없이 재빌드 |
+| `make docker-build` | 이미지 캐시 없이 재빌드 후 마이그레이션/시드 실행 |
+| `make docker-clean` | 모든 컨테이너/볼륨 정리 |
 | `make status` | 컨테이너, 환경, env 상태 요약 표시 |
 | `make check-docker` | Docker 런타임 연결 상태 확인 |
 

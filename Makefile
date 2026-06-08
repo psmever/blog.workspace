@@ -17,7 +17,7 @@ DB_TUNNEL_SCRIPT = ./scripts/db-tunnel-prod.sh
 
 .PHONY: check-docker check-env-files check-repos \
         up down \
-        build build-images clean \
+        docker-build docker-build-images docker-clean \
         sh-backend sh-frontend artisan migrate seed yarn \
         source-update \
         logs backend-log-clear backend-log-error \
@@ -45,9 +45,9 @@ help:
 	@echo "  make restart-backend     → Laravel 컨테이너 재시작"
 	@echo "  make restart-db          → MariaDB 컨테이너 재시작"
 	@echo ""
-	@echo "🧹 빌드 및 정리:"
-	@echo "  make build              → 로컬 이미지 재빌드 후 migrate/seed 실행"
-	@echo "  make clean              → 모든 컨테이너/볼륨 정리"
+	@echo "🐳 Docker:"
+	@echo "  make docker-build       → 로컬 이미지 재빌드 후 migrate/seed 실행"
+	@echo "  make docker-clean       → 모든 컨테이너/볼륨 정리"
 	@echo ""
 	@echo "🧩 개발 유틸리티:"
 	@echo "  make artisan                 → Laravel Artisan 명령 목록 표시"
@@ -177,22 +177,22 @@ restart-db:
 	@echo "✅ MariaDB restarted."
 
 # ===============================
-# 🧩 Build / Clean / Reset
+# 🐳 Docker Build / Clean
 # ===============================
 
-build-images:
+docker-build-images:
 	@echo "🔧 Building Docker images..."
 	@$(MAKE) check-docker
 	$(DOCKER_BUILD_ENV) $(DC) -f $(COMPOSE_FILE) build --no-cache
 
-build:
-	@$(MAKE) build-images
+docker-build:
+	@$(MAKE) docker-build-images
 	@echo "🗄️ Running migrations..."
 	@$(MAKE) migrate
 	@echo "🌱 Running seeders..."
 	@$(MAKE) seed
 
-clean:
+docker-clean:
 	@echo "🧹 Cleaning environment..."
 	$(DC) -f $(COMPOSE_FILE) down -v || true
 	@echo "✅ Clean complete."

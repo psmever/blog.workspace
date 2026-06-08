@@ -29,7 +29,8 @@
 - 로컬 컨테이너 시작: `make up`
 - 로컬 컨테이너 중지: `make down`
 - 상태 확인: `make status`
-- 이미지 빌드 + 마이그레이션 + 시드: `make build`
+- 이미지 빌드 + 마이그레이션 + 시드: `make docker-build`
+- 컨테이너/볼륨 정리: `make docker-clean`
 - 마이그레이션: `make migrate`
 - 시더 실행: `make seed`
 - Backend 셸 접속: `make sh-backend`
