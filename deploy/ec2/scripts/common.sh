@@ -3,6 +3,11 @@ set -Eeuo pipefail
 
 : "${BLOG_DEPLOY_ROOT:=/opt/deploy/blog}"
 : "${BLOG_DEPLOY_BRANCH:=main}"
+: "${BLOG_DEPLOY_SOURCE_BRANCH:=develop}"
+: "${BLOG_DEPLOY_TAG_ENV:=prod}"
+: "${BLOG_DEPLOY_TAG_PREFIX:=deploy/${BLOG_DEPLOY_TAG_ENV}}"
+: "${BLOG_DEPLOY_TAG_REMOTE:=origin}"
+: "${BLOG_DEPLOY_SESSION_TIMESTAMP:=$(date +%Y%m%d-%H%M%S)}"
 : "${BLOG_BACKEND_DIR:=/var/www/jaubi.co.kr/blog/blog.backend}"
 : "${BLOG_FRONTEND_DIR:=/var/www/jaubi.co.kr/blog/blog.frontend}"
 : "${BLOG_LOG_DIR:=${BLOG_DEPLOY_ROOT}/logs}"
@@ -124,6 +129,70 @@ fast_forward_branch() {
     git -C "$repo_dir" merge --ff-only "origin/${branch}" >&2
 }
 
+rollback_server_merge() {
+    local repo_dir=$1
+    local branch=$2
+    local commit_sha=$3
+
+    log "서버 ${branch} 브랜치를 병합 전 커밋으로 원복합니다: $commit_sha"
+
+    if git -C "$repo_dir" rev-parse --verify --quiet MERGE_HEAD >/dev/null; then
+        git -C "$repo_dir" merge --abort || true
+    fi
+
+    git -C "$repo_dir" reset --hard "$commit_sha"
+}
+
+promote_source_to_deploy_branch() {
+    local component=$1
+    local repo_dir=$2
+    local previous_commit
+    local ancestor_status=0
+
+    BLOG_PROMOTION_HAS_CHANGES=0
+    BLOG_RESOLVED_COMMIT=""
+
+    log "[Git 1/5] origin/${BLOG_DEPLOY_BRANCH}, origin/${BLOG_DEPLOY_SOURCE_BRANCH} 브랜치를 fetch 합니다."
+    fetch_origin_branch "$repo_dir" "$BLOG_DEPLOY_BRANCH"
+    fetch_origin_branch "$repo_dir" "$BLOG_DEPLOY_SOURCE_BRANCH"
+
+    log "[Git 2/5] ${BLOG_DEPLOY_BRANCH} 브랜치를 origin/${BLOG_DEPLOY_BRANCH} 까지 fast-forward 합니다."
+    checkout_branch "$repo_dir" "$BLOG_DEPLOY_BRANCH"
+    ensure_branch_not_ahead "$repo_dir" "$BLOG_DEPLOY_BRANCH"
+    fast_forward_branch "$repo_dir" "$BLOG_DEPLOY_BRANCH"
+    previous_commit=$(git -C "$repo_dir" rev-parse HEAD)
+
+    log "[Git 3/5] origin/${BLOG_DEPLOY_SOURCE_BRANCH} 미반영 커밋을 확인합니다."
+    if git -C "$repo_dir" merge-base --is-ancestor \
+        "origin/${BLOG_DEPLOY_SOURCE_BRANCH}" "$BLOG_DEPLOY_BRANCH"; then
+        BLOG_RESOLVED_COMMIT=$previous_commit
+        log "[Git 4/5] 신규 커밋 없음: 병합과 origin/${BLOG_DEPLOY_BRANCH} push를 생략합니다."
+        log "[Git 5/5] 현재 ${BLOG_DEPLOY_BRANCH} 커밋을 재배포합니다: ${BLOG_RESOLVED_COMMIT}"
+        return
+    else
+        ancestor_status=$?
+    fi
+
+    [ "$ancestor_status" = "1" ] \
+        || die "신규 커밋 확인에 실패했습니다: ${component} origin/${BLOG_DEPLOY_SOURCE_BRANCH} -> ${BLOG_DEPLOY_BRANCH}"
+
+    BLOG_PROMOTION_HAS_CHANGES=1
+    log "[Git 4/5] origin/${BLOG_DEPLOY_SOURCE_BRANCH} 을 ${BLOG_DEPLOY_BRANCH} 에 --no-ff 로 병합합니다."
+    if ! git -C "$repo_dir" merge --no-ff "origin/${BLOG_DEPLOY_SOURCE_BRANCH}" \
+        -m "Merge origin/${BLOG_DEPLOY_SOURCE_BRANCH} into ${BLOG_DEPLOY_BRANCH} for deployment"; then
+        rollback_server_merge "$repo_dir" "$BLOG_DEPLOY_BRANCH" "$previous_commit"
+        die "서버 브랜치 병합에 실패했습니다: ${component} origin/${BLOG_DEPLOY_SOURCE_BRANCH} -> ${BLOG_DEPLOY_BRANCH}"
+    fi
+
+    BLOG_RESOLVED_COMMIT=$(git -C "$repo_dir" rev-parse HEAD)
+    log "[Git 5/5] 병합 커밋을 origin/${BLOG_DEPLOY_BRANCH} 으로 push 합니다: ${BLOG_RESOLVED_COMMIT}"
+    if ! git -C "$repo_dir" push origin "${BLOG_DEPLOY_BRANCH}:${BLOG_DEPLOY_BRANCH}"; then
+        rollback_server_merge "$repo_dir" "$BLOG_DEPLOY_BRANCH" "$previous_commit"
+        BLOG_RESOLVED_COMMIT=""
+        die "원격 브랜치 push에 실패했습니다: ${component} origin/${BLOG_DEPLOY_BRANCH}"
+    fi
+}
+
 ensure_branch_not_ahead() {
     local repo_dir=$1
     local branch=${2:-$BLOG_DEPLOY_BRANCH}
@@ -147,16 +216,50 @@ sync_repo_to_branch() {
     git -C "$repo_dir" rev-parse HEAD
 }
 
+create_and_push_deploy_tag() {
+    local component=$1
+    local repo_dir=$2
+    local commit_sha=$3
+    local deployed_at=$4
+    local tag_name="${BLOG_DEPLOY_TAG_PREFIX}/${component}/${BLOG_DEPLOY_SESSION_TIMESTAMP}"
+    local remote_tag_output
+
+    git -C "$repo_dir" rev-parse --verify --quiet "refs/tags/${tag_name}" >/dev/null 2>&1 \
+        && die "로컬 배포 태그가 이미 존재합니다: ${tag_name}"
+
+    remote_tag_output=$(git -C "$repo_dir" ls-remote --tags --refs \
+        "$BLOG_DEPLOY_TAG_REMOTE" "refs/tags/${tag_name}") \
+        || die "원격 배포 태그 확인에 실패했습니다: ${tag_name}"
+    [ -z "$remote_tag_output" ] || die "원격 배포 태그가 이미 존재합니다: ${tag_name}"
+
+    log "배포 태그를 생성합니다: ${tag_name} commit=${commit_sha}"
+    git -C "$repo_dir" tag -a "$tag_name" "$commit_sha" \
+        -m "Deploy ${BLOG_DEPLOY_TAG_ENV} ${component} ${BLOG_DEPLOY_SESSION_TIMESTAMP}" \
+        -m "environment: ${BLOG_DEPLOY_TAG_ENV}" \
+        -m "component: ${component}" \
+        -m "branch: ${BLOG_DEPLOY_BRANCH}" \
+        -m "commit: ${commit_sha}" \
+        -m "deployed_at: ${deployed_at}"
+
+    if ! git -C "$repo_dir" push "$BLOG_DEPLOY_TAG_REMOTE" "refs/tags/${tag_name}"; then
+        git -C "$repo_dir" tag -d "$tag_name" >/dev/null 2>&1 || true
+        die "배포는 완료됐지만 태그 push에 실패했습니다: ${component} ${tag_name}"
+    fi
+
+    log "배포 태그 push 완료: ${tag_name}"
+}
+
 record_deploy_state() {
     local component=$1
     local deploy_branch=$2
     local commit_sha=$3
+    local deployed_at=${4:-$(date -Iseconds)}
     local state_file="${BLOG_STATE_DIR}/${component}.last_deploy"
 
     cat > "$state_file" <<EOF
 deploy_branch=$deploy_branch
 commit_sha=$commit_sha
-deployed_at=$(date -Iseconds)
+deployed_at=$deployed_at
 EOF
 }
 

@@ -22,15 +22,15 @@
 
 - 실제 배포 로직은 서버 `/opt/deploy/blog/*.sh` 에 둡니다.
 - 로컬 `make deploy-*` 를 SSH 진입점으로 사용합니다.
-- `backend`, `frontend` 모두 로컬에서 `origin/develop` 을 `main` 에 `--no-ff` 로 병합하고 `origin/main` 으로 push한 뒤, 서버 저장소의 `origin/main` 을 pull 해서 배포합니다.
-- 로컬 병합 충돌 또는 push 실패 시 로컬 `main` 을 병합 전 커밋으로 원복하고 배포를 중단합니다.
-- `origin/develop` 에 `main` 미반영 커밋이 없으면 로컬 병합, 서버 Git 동기화, 배포 태그 생성을 생략하고 서버 재배포만 수행합니다.
-- 배포 스크립트는 성공 또는 실패로 종료되기 직전에 처리한 로컬 저장소를 `develop` 브랜치로 checkout 합니다.
+- `backend`, `frontend` 모두 서버에서 `origin/develop` 을 `main` 에 `--no-ff` 로 병합하고 `origin/main` 으로 push한 뒤 배포합니다.
+- 서버 병합 충돌 또는 push 실패 시 서버 `main` 을 병합 전 커밋으로 원복하고 빌드 전에 배포를 중단합니다.
+- `origin/develop` 에 `main` 미반영 커밋이 없으면 병합, push, 배포 태그 생성을 생략하고 현재 서버 `main` 커밋을 재배포합니다.
+- 서버 Git remote는 backend/frontend 각 저장소에 대한 fetch, `main` push, tag push 권한이 필요합니다.
 - 실행 중에는 전체 순서도와 단계별 분기 사유를 화면에 출력합니다.
 - 둘 다 반영할 때는 `backend -> frontend` 순서로 배포합니다.
 - PM2 실행 기준 파일은 `blog.frontend/ecosystem.config.cjs` 입니다.
 - 워크스페이스의 [deploy/ec2/pm2/ecosystem.config.cjs](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/deploy/ec2/pm2/ecosystem.config.cjs:1) 는 참고용 템플릿입니다.
-- `deploy-backend.sh`, `deploy-frontend.sh` 는 기본적으로 각 저장소의 `main` 브랜치를 반영하며, `--skip-git-sync` 재배포 모드에서는 서버 Git 동기화를 생략합니다.
+- `deploy-backend.sh`, `deploy-frontend.sh` 는 각 저장소에서 `develop` 을 `main` 으로 승격한 뒤 배포합니다.
 - `deploy-all.sh` 는 인자를 받지 않고 backend, frontend 순서로 각 저장소의 `main` 브랜치를 반영합니다.
 
 ## 준비 자료
@@ -69,7 +69,7 @@
 - frontend만 배포: `make deploy-frontend`
 - 둘 다 배포: `make deploy-all`
 - 마지막 배포 상태 확인: `make deploy-status`
-- 각 배포가 성공하면 로컬 래퍼가 `deploy/prod/<app>/<timestamp>` Git tag를 해당 앱 저장소 `origin` 으로 push
+- 신규 커밋 승격 배포가 성공하면 서버가 `deploy/prod/<app>/<timestamp>` Git tag를 해당 앱 저장소 `origin` 으로 push
 
 ```bash
 make deploy-sync
@@ -80,7 +80,7 @@ make deploy-status
 ```
 
 - 내부 구현은 [scripts/deploy-prod.sh](/Users/sm/Workspaces/Development/MyProject/blog/blog.workspace/scripts/deploy-prod.sh:1) 가 맡고, 필요하면 서버에서 `/opt/deploy/blog/deploy-backend.sh`, `/opt/deploy/blog/deploy-frontend.sh`, `/opt/deploy/blog/deploy-all.sh`, `/opt/deploy/blog/deploy-status.sh` 를 직접 실행할 수도 있습니다.
-- Git 배포 태그 자동 생성은 로컬 `make deploy-*` 경로에서만 수행됩니다.
+- Git 배포 태그는 서버 배포 스크립트가 신규 승격 배포 성공 후 생성합니다.
 
 ## 최종 점검
 
