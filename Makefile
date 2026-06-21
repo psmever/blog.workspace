@@ -58,7 +58,7 @@ help:
 	@echo "  make yarn               → Next.js 패키지 설치"
 	@echo "  make sh-backend         → Backend 컨테이너 쉘 접속"
 	@echo "  make sh-frontend        → Frontend 컨테이너 쉘 접속"
-	@echo "  make source-update      → backend/frontend develop, main 최신화 후 develop으로 복귀"
+	@echo "  make source-update      → 존재하는 backend/frontend develop 최신화"
 	@echo ""
 	@echo "📜 로그:"
 	@echo "  make logs             → docker-compose 전체 로그 출력 (SERVICE=이름 으로 단일 서비스 지정 가능)"
@@ -222,8 +222,8 @@ source-update:
 	@set -eu; \
 	for repo in "$(BACKEND_DIR)" "$(FRONTEND_DIR)"; do \
 		if [ ! -d "$$repo/.git" ]; then \
-			echo "❌ Git 저장소가 없습니다: $$repo"; \
-			exit 1; \
+			echo "⏭️ Git 저장소가 없어 건너뜁니다: $$repo"; \
+			continue; \
 		fi; \
 		if ! git -C "$$repo" diff --quiet || ! git -C "$$repo" diff --cached --quiet; then \
 			echo "❌ 변경사항이 남아 있어 중단합니다: $$repo"; \
@@ -232,15 +232,13 @@ source-update:
 		fi; \
 	done; \
 	for repo in "$(BACKEND_DIR)" "$(FRONTEND_DIR)"; do \
+		if [ ! -d "$$repo/.git" ]; then \
+			continue; \
+		fi; \
 		name=$$(basename "$$repo"); \
 		echo "🔄 $$name: develop 최신화"; \
 		git -C "$$repo" checkout develop; \
 		git -C "$$repo" pull --ff-only origin develop; \
-		echo "🔄 $$name: main 최신화"; \
-		git -C "$$repo" checkout main; \
-		git -C "$$repo" pull --ff-only origin main; \
-		echo "↩️ $$name: develop으로 복귀"; \
-		git -C "$$repo" checkout develop; \
 	done; \
 	echo "✅ backend/frontend source-update 완료."
 
